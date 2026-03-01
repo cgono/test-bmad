@@ -5,17 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import UploadForm from '../../../features/process/components/UploadForm'
 
+const DEFAULT_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_test',
+  data: {
+    ocr: {
+      segments: [{ text: '你好', language: 'zh', confidence: 0.98 }]
+    },
+    pinyin: {
+      segments: [
+        { hanzi: '你', pinyin: 'nǐ' },
+        { hanzi: '好', pinyin: 'hǎo' },
+      ]
+    },
+    job_id: null
+  }
+}
+
 vi.mock('../../../lib/api-client', () => ({
-  submitProcessRequest: vi.fn(async () => ({
-    status: 'success',
-    request_id: 'req_test',
-    data: {
-      ocr: {
-        segments: [{ text: '你好', language: 'zh', confidence: 0.98 }]
-      },
-      job_id: null
-    }
-  }))
+  submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE)
 }))
 
 import { submitProcessRequest } from '../../../lib/api-client'
@@ -74,7 +82,7 @@ describe('UploadForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not read that image/i)
   })
 
-  it('shows OCR segment preview when extraction succeeds', async () => {
+  it('shows pinyin reading result when extraction succeeds', async () => {
     const user = userEvent.setup()
     renderWithClient(<UploadForm />)
     const form = screen.getByRole('form', { name: /process-upload-form/i })
@@ -83,9 +91,79 @@ describe('UploadForm', () => {
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(within(form).getByRole('button', { name: /submit/i }))
 
-    expect(await screen.findByText('Extracted Text')).toBeInTheDocument()
+    expect(await screen.findByLabelText(/pinyin-result/i)).toBeInTheDocument()
+    expect(screen.getByText('Pinyin Reading')).toBeInTheDocument()
+    // Characters are rendered as ruby elements
+    expect(screen.getByText('你')).toBeInTheDocument()
+    expect(screen.getByText('好')).toBeInTheDocument()
+    // Pinyin readings are rendered as rt elements
+    expect(screen.getByText('nǐ')).toBeInTheDocument()
+    expect(screen.getByText('hǎo')).toBeInTheDocument()
+  })
+
+  it('shows explicit completion state when processing succeeds', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByLabelText(/processing-complete/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/processing-complete/i)).toHaveTextContent(/processing complete/i)
+  })
+
+  it('shows unified result view with image and pinyin together', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/result-view/i)).toBeInTheDocument()
+    })
+
+    const resultView = screen.getByLabelText(/result-view/i)
+    // Image and pinyin are both present inside the unified result view
+    expect(within(resultView).getByRole('img', { name: /uploaded image/i })).toBeInTheDocument()
+    expect(within(resultView).getByLabelText(/pinyin-result/i)).toBeInTheDocument()
+  })
+
+  it('shows OCR details in secondary collapsed section', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/result-view/i)
+    // OCR details available in a disclosure widget (secondary)
+    expect(screen.getByText(/extracted text/i)).toBeInTheDocument()
     expect(screen.getByText(/你好/)).toBeInTheDocument()
     expect(screen.getByText(/zh, 98%/i)).toBeInTheDocument()
+  })
+
+  it('shows pinyin retry guidance when pinyin fails', async () => {
+    submitProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('pinyin unavailable'), { code: 'pinyin_provider_unavailable' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /pinyin generation is temporarily unavailable/i
+    )
   })
 
   it('shows OCR retry guidance when OCR fails', async () => {
@@ -124,16 +202,7 @@ describe('UploadForm', () => {
 
     expect(await screen.findByText(/uploading image/i)).toBeInTheDocument()
 
-    release({
-      status: 'success',
-      request_id: 'req_progress',
-      data: {
-        ocr: {
-          segments: [{ text: '你好', language: 'zh', confidence: 0.9 }]
-        },
-        job_id: null
-      }
-    })
+    release(DEFAULT_SUCCESS_RESPONSE)
 
     await waitFor(() => {
       expect(screen.getByText(/status:\s*success/i)).toBeInTheDocument()
@@ -157,3 +226,4 @@ describe('UploadForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/unexpected server error occurred/i)
   })
 })
+

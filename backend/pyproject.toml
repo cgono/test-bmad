@@ -9,6 +9,7 @@ dependencies = [
   "langchain-core==0.3.61",
   "pillow==11.2.1",
   "pydantic==2.11.9",
+  "pypinyin==0.55.0",
   "python-multipart==0.0.20",
   "uvicorn[standard]==0.37.0",
 ]

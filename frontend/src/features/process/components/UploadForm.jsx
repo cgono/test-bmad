@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useMutation } from '@tanstack/react-query'
 
@@ -12,7 +12,9 @@ const recoveryGuidanceByCode = {
   image_too_large_pixels: 'Image dimensions are too large. Retake with lower resolution and retry.',
   ocr_execution_failed: 'Text extraction encountered an error. Tap Take Photo to retry.',
   ocr_no_text_detected: 'No readable Chinese text detected. Retake the photo and try again.',
-  ocr_provider_unavailable: 'Text extraction is temporarily unavailable. Tap Take Photo to retry.'
+  ocr_provider_unavailable: 'Text extraction is temporarily unavailable. Tap Take Photo to retry.',
+  pinyin_provider_unavailable: 'Pinyin generation is temporarily unavailable. Tap Submit to retry.',
+  pinyin_execution_failed: 'Pinyin generation encountered an error. Tap Submit to retry.',
 }
 
 function formatConfidence(confidence) {
@@ -21,7 +23,19 @@ function formatConfidence(confidence) {
 
 export default function UploadForm() {
   const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
   const cameraInputRef = useRef(null)
+
+  // Create and revoke object URL when file changes
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
 
   const mutation = useMutation({
     mutationFn: () => submitProcessRequest(file),
@@ -32,7 +46,8 @@ export default function UploadForm() {
     mutation.mutate()
   }
 
-  const segments = mutation.data?.data?.ocr?.segments || []
+  const pinyinSegments = mutation.data?.data?.pinyin?.segments || []
+  const ocrSegments = mutation.data?.data?.ocr?.segments || []
 
   return (
     <section>
@@ -81,20 +96,56 @@ export default function UploadForm() {
 
         {mutation.data && (
           <div>
+            {mutation.data.status === 'success' && (
+              <p aria-label="processing-complete">
+                ✓ Processing complete
+              </p>
+            )}
             <p>Status: {mutation.data.status}</p>
             <p>Request ID: {mutation.data.request_id}</p>
-            {segments.length > 0 && (
-              <div>
-                <h3>Extracted Text</h3>
+
+            {/* Unified result: image + pinyin reading together */}
+            {(previewUrl || pinyinSegments.length > 0) && (
+              <div aria-label="result-view" style={{ marginTop: '1rem' }}>
+                {previewUrl && (
+                  <div>
+                    <img
+                      src={previewUrl}
+                      alt="Uploaded image"
+                      style={{ maxWidth: '100%', maxHeight: 320, display: 'block', marginBottom: '1rem' }}
+                    />
+                  </div>
+                )}
+
+                {pinyinSegments.length > 0 && (
+                  <div aria-label="pinyin-result">
+                    <h3>Pinyin Reading</h3>
+                    <div style={{ fontSize: '1.4rem', lineHeight: 2.5, wordBreak: 'break-all' }}>
+                      {pinyinSegments.map((seg, index) => (
+                        <ruby key={`${seg.hanzi}-${index}`}>
+                          {seg.hanzi}
+                          <rt style={{ fontSize: '0.55em', color: '#555' }}>{seg.pinyin}</rt>
+                        </ruby>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Secondary: raw OCR details */}
+            {ocrSegments.length > 0 && (
+              <details style={{ marginTop: '1rem' }}>
+                <summary>Extracted Text (OCR details)</summary>
                 <ul>
-                  {segments.map((segment, index) => (
+                  {ocrSegments.map((segment, index) => (
                     <li key={`${segment.text}-${index}`}>
                       <span>{segment.text}</span>{' '}
                       <span>({segment.language}, {formatConfidence(segment.confidence)})</span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </details>
             )}
           </div>
         )}
@@ -102,3 +153,4 @@ export default function UploadForm() {
     </section>
   )
 }
+

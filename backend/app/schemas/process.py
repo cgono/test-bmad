@@ -13,10 +13,20 @@ class OcrData(BaseModel):
     segments: list[OcrSegment]
 
 
+class PinyinSegment(BaseModel):
+    hanzi: str
+    pinyin: str
+
+
+class PinyinData(BaseModel):
+    segments: list[PinyinSegment]
+
+
 class ProcessData(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     ocr: OcrData | None = None
+    pinyin: PinyinData | None = None
     message: str | None = None
     job_id: str | None = None
 

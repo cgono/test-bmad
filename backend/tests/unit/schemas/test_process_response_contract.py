@@ -1,7 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.process import OcrData, OcrSegment, ProcessData, ProcessError, ProcessResponse, ProcessWarning
+from app.schemas.process import (
+    OcrData,
+    OcrSegment,
+    ProcessData,
+    ProcessError,
+    ProcessResponse,
+    ProcessWarning,
+)
 
 
 def test_success_envelope_requires_data() -> None:

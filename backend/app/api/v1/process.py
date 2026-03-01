@@ -5,11 +5,12 @@ from fastapi import APIRouter, Request, UploadFile
 
 from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse
 from app.services.image_validation import (
-    ImageValidationError,
     MAX_FILE_SIZE_BYTES,
+    ImageValidationError,
     validate_image_upload,
 )
 from app.services.ocr_service import OcrServiceError, extract_chinese_segments
+from app.services.pinyin_service import PinyinServiceError, generate_pinyin
 
 router = APIRouter()
 
@@ -38,11 +39,21 @@ async def _build_process_response(
             error=ProcessError(category=error.category, code=error.code, message=error.message),
         )
 
+    try:
+        pinyin_data = await generate_pinyin(segments)
+    except PinyinServiceError as error:
+        return ProcessResponse(
+            status="error",
+            request_id=request_id,
+            error=ProcessError(category=error.category, code=error.code, message=error.message),
+        )
+
     return ProcessResponse(
         status='success',
         request_id=request_id,
         data=ProcessData(
             ocr=OcrData(segments=segments),
+            pinyin=pinyin_data,
             job_id=None,
         ),
     )
