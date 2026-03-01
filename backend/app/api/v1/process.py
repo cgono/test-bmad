@@ -3,25 +3,46 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Request, UploadFile
 
-from app.schemas.process import ProcessData, ProcessError, ProcessResponse
+from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse
 from app.services.image_validation import (
     ImageValidationError,
     MAX_FILE_SIZE_BYTES,
     validate_image_upload,
 )
+from app.services.ocr_service import OcrServiceError, extract_chinese_segments
 
 router = APIRouter()
 
 
-async def _build_process_response(file: UploadFile | None, *, request_id: str) -> ProcessResponse:
-    """Build the process response. Extracted as a seam for contract-test patching."""
+async def _build_process_response(
+    image_bytes: bytes | None, content_type: str, *, request_id: str
+) -> ProcessResponse:
     # payload=ProcessPayload( legacy placeholder retained for scaffold smoke-test compatibility.
-    _ = file  # Reserved for OCR pipeline in later stories.
+    if not image_bytes:
+        return ProcessResponse(
+            status="error",
+            request_id=request_id,
+            error=ProcessError(
+                category="ocr",
+                code="ocr_no_text_detected",
+                message="No readable Chinese text was detected. Retake the photo and try again.",
+            ),
+        )
+
+    try:
+        segments = await extract_chinese_segments(image_bytes, content_type)
+    except OcrServiceError as error:
+        return ProcessResponse(
+            status="error",
+            request_id=request_id,
+            error=ProcessError(category=error.category, code=error.code, message=error.message),
+        )
+
     return ProcessResponse(
         status='success',
         request_id=request_id,
         data=ProcessData(
-            message='validation-passed-ocr-pending',
+            ocr=OcrData(segments=segments),
             job_id=None,
         ),
     )
@@ -29,7 +50,7 @@ async def _build_process_response(file: UploadFile | None, *, request_id: str) -
 
 def _build_validation_error_response(request_id: str, error: ImageValidationError) -> ProcessResponse:
     return ProcessResponse(
-        status='error',
+        status="error",
         request_id=request_id,
         error=ProcessError(
             category=error.category,
@@ -76,4 +97,4 @@ async def process_image(
     except ImageValidationError as error:
         return _build_validation_error_response(request_id=request_id, error=error)
 
-    return await _build_process_response(file, request_id=request_id)
+    return await _build_process_response(file_bytes, content_type, request_id=request_id)

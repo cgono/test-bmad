@@ -9,7 +9,12 @@ vi.mock('../../../lib/api-client', () => ({
   submitProcessRequest: vi.fn(async () => ({
     status: 'success',
     request_id: 'req_test',
-    data: { message: 'validation-passed-ocr-pending', job_id: null }
+    data: {
+      ocr: {
+        segments: [{ text: '你好', language: 'zh', confidence: 0.98 }]
+      },
+      job_id: null
+    }
   }))
 }))
 
@@ -44,12 +49,13 @@ describe('UploadForm', () => {
     renderWithClient(<UploadForm />)
     const form = screen.getByRole('form', { name: /process-upload-form/i })
 
-    const file = new File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(within(form).getByRole('button', { name: /submit/i }))
 
     expect(submitProcessRequest).toHaveBeenCalledTimes(1)
-    expect(await screen.findByText(/request path confirmed/i)).toBeInTheDocument()
+    expect(await screen.findByText(/status:\s*success/i)).toBeInTheDocument()
+    expect(screen.getByText(/request id:\s*req_test/i)).toBeInTheDocument()
   })
 
   it('shows actionable guidance when validation fails', async () => {
@@ -61,11 +67,42 @@ describe('UploadForm', () => {
     renderWithClient(<UploadForm />)
     const form = screen.getByRole('form', { name: /process-upload-form/i })
 
-    const file = new File(['bad-bytes'], 'bad.png', { type: 'image/png' })
+    const file = new globalThis.File(['bad-bytes'], 'bad.png', { type: 'image/png' })
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(within(form).getByRole('button', { name: /submit/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not read that image/i)
+  })
+
+  it('shows OCR segment preview when extraction succeeds', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByText('Extracted Text')).toBeInTheDocument()
+    expect(screen.getByText(/你好/)).toBeInTheDocument()
+    expect(screen.getByText(/zh, 98%/i)).toBeInTheDocument()
+  })
+
+  it('shows OCR retry guidance when OCR fails', async () => {
+    submitProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('OCR no text'), { code: 'ocr_no_text_detected' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no readable chinese text detected/i)
+    expect(screen.getByRole('button', { name: /take photo/i })).toBeInTheDocument()
   })
 
   it('shows progress state while valid upload is being processed', async () => {
@@ -81,7 +118,7 @@ describe('UploadForm', () => {
     renderWithClient(<UploadForm />)
     const form = screen.getByRole('form', { name: /process-upload-form/i })
 
-    const file = new File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(within(form).getByRole('button', { name: /submit/i }))
 
@@ -90,11 +127,16 @@ describe('UploadForm', () => {
     release({
       status: 'success',
       request_id: 'req_progress',
-      data: { message: 'validation-passed-ocr-pending', job_id: null }
+      data: {
+        ocr: {
+          segments: [{ text: '你好', language: 'zh', confidence: 0.9 }]
+        },
+        job_id: null
+      }
     })
 
     await waitFor(() => {
-      expect(screen.getByText(/valid image accepted/i)).toBeInTheDocument()
+      expect(screen.getByText(/status:\s*success/i)).toBeInTheDocument()
     })
   })
 
@@ -107,11 +149,11 @@ describe('UploadForm', () => {
     renderWithClient(<UploadForm />)
     const form = screen.getByRole('form', { name: /process-upload-form/i })
 
-    const file = new File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(within(form).getByRole('button', { name: /submit/i }))
 
-    // code not in validationGuidanceByCode → falls back to error.message
+    // code not in recoveryGuidanceByCode -> falls back to error.message
     expect(await screen.findByRole('alert')).toHaveTextContent(/unexpected server error occurred/i)
   })
 })

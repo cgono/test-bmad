@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "FastAPI backend for test-bmad."
 requires-python = ">=3.12"
 dependencies = [
+  "boto3==1.37.26",
   "fastapi==0.129.0",
+  "langchain-core==0.3.61",
   "pillow==11.2.1",
   "pydantic==2.11.9",
   "python-multipart==0.0.20",
@@ -34,5 +36,5 @@ extend-exclude = [".venv"]
 select = ["E", "F", "I", "W", "N"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "tests"]
 testpaths = ["tests"]

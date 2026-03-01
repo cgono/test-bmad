@@ -1,12 +1,23 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class OcrSegment(BaseModel):
+    text: str
+    language: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class OcrData(BaseModel):
+    segments: list[OcrSegment]
 
 
 class ProcessData(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    message: str
+    ocr: OcrData | None = None
+    message: str | None = None
     job_id: str | None = None
 
 
