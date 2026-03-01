@@ -15,6 +15,23 @@ from app.services.pinyin_service import PinyinServiceError, generate_pinyin
 router = APIRouter()
 
 
+async def _read_request_body_with_limit(request: Request, *, max_bytes: int) -> bytes:
+    """Read request body incrementally and enforce a strict byte ceiling."""
+    total_bytes = 0
+    chunks: list[bytes] = []
+    async for chunk in request.stream():
+        if not chunk:
+            continue
+        total_bytes += len(chunk)
+        if total_bytes > max_bytes:
+            raise ImageValidationError(
+                code="file_too_large",
+                message="Image is too large. Please upload a smaller file and try again.",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 async def _build_process_response(
     image_bytes: bytes | None, content_type: str, *, request_id: str
 ) -> ProcessResponse:
@@ -93,7 +110,14 @@ async def process_image(
         except ValueError:
             pass  # Malformed Content-Length header; let validation handle it after body read.
 
-    file_bytes = await request.body()
+    try:
+        file_bytes = await _read_request_body_with_limit(
+            request,
+            max_bytes=MAX_FILE_SIZE_BYTES,
+        )
+    except ImageValidationError as error:
+        return _build_validation_error_response(request_id=request_id, error=error)
+
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     file = None
     if file_bytes:

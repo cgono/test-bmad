@@ -12,13 +12,20 @@ export async function submitProcessRequest(file) {
     body: file || undefined
   })
 
-  const payload = await response.json()
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
+  let payload = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
   }
 
-  if (payload.status === 'error') {
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || `Request failed with status ${response.status}`)
+    error.code = payload?.error?.code || 'http_error'
+    throw error
+  }
+
+  if (payload?.status === 'error') {
     const error = new Error(payload.error?.message || 'Upload failed')
     error.code = payload.error?.code || 'unknown_error'
     throw error

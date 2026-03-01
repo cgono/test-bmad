@@ -32,6 +32,8 @@ class PyPinyinProvider:
             raise PinyinExecutionError(str(exc)) from exc
 
         characters = list(text)
+        if len(per_char_pinyin) != len(characters):
+            raise PinyinExecutionError("Pinyin provider returned malformed output")
         segments: list[RawPinyinSegment] = []
         for char, pinyin_options in zip(characters, per_char_pinyin):
             # pypinyin returns a list of readings per character; take the first.

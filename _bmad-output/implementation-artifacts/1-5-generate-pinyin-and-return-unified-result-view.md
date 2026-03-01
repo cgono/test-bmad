@@ -1,6 +1,6 @@
 # Story 1.5: Generate Pinyin and Return Unified Result View
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -219,6 +219,24 @@ Claude Sonnet 4.6
   - AC2: Completion state clearly indicated (`✓ Processing complete`); response shape remains versioned under `/v1` with no auth changes.
 - Architecture compliance: thin route orchestration, service/adapter boundaries maintained, strict envelope invariants preserved (no mixed fields).
 - `pypinyin==0.55.0` added to `pyproject.toml` dependencies.
+- Code review fixes applied:
+  - Enforced request body size limit during streaming reads in `/v1/process` (not only via `Content-Length`) to prevent oversized upload memory pressure.
+  - Preserved backend structured error code/message for non-2xx frontend responses so UI recovery guidance remains accurate.
+  - Added strict pinyin output length validation in adapter to prevent silent truncation on malformed provider output.
+  - Hardened CORS defaults to localhost allowlist with env-configurable origins (`CORS_ALLOW_ORIGINS`).
+
+### Senior Developer Review (AI)
+
+- Review date: 2026-03-02
+- Outcome: Changes Requested -> Fixed
+- Findings addressed:
+  - HIGH: Unbounded request-body read path in `backend/app/api/v1/process.py` for missing/malformed `Content-Length`.
+  - MEDIUM: Frontend API client dropped backend structured error metadata on non-2xx responses.
+  - MEDIUM: Pinyin adapter could silently truncate output on provider/input length mismatch.
+  - MEDIUM: CORS policy used wildcard origin instead of localhost-focused allowlist.
+- Verification after fixes:
+  - Backend full suite: `51 passed`
+  - Frontend full suite: `15 passed`
 
 ### Debug Log References
 
@@ -237,11 +255,16 @@ New files:
 Modified files:
 - `backend/app/schemas/process.py`
 - `backend/app/api/v1/process.py`
+- `backend/app/main.py`
 - `backend/pyproject.toml`
 - `backend/tests/integration/api_v1/test_process_route.py`
 - `backend/tests/contract/response_envelopes/test_process_envelopes.py`
+- `backend/tests/unit/adapters/test_pypinyin_provider.py`
+- `backend/tests/unit/test_main.py`
 - `frontend/src/features/process/components/UploadForm.jsx`
 - `frontend/src/__tests__/features/process/upload-form.test.jsx`
+- `frontend/src/lib/api-client.js`
+- `frontend/tests/lib/api-client.test.js`
 - `frontend/src/test/setup.js`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/1-5-generate-pinyin-and-return-unified-result-view.md`
@@ -249,3 +272,4 @@ Modified files:
 ### Change Log
 
 - 2026-03-02: Implemented Story 1.5 — pinyin service + provider seam, schema extension, route integration, unified frontend result view with image preview and ruby pinyin rendering, full test coverage (unit/integration/contract/frontend).
+- 2026-03-02: Code review remediation — fixed body size enforcement during stream read, non-2xx structured error propagation in frontend API client, pinyin adapter output-length validation, and CORS localhost allowlist defaults with new regression tests.

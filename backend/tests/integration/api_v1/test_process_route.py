@@ -6,6 +6,7 @@ from helpers import PNG_1X1_BYTES, StubOcrProvider, _request_with_body
 from app.adapters.ocr_provider import RawOcrSegment
 from app.adapters.pinyin_provider import PinyinProviderUnavailableError, RawPinyinSegment
 from app.api.v1.process import process_image
+from app.services.image_validation import MAX_FILE_SIZE_BYTES
 
 
 class StubPinyinProvider:
@@ -123,3 +124,12 @@ def test_process_route_missing_file_returns_validation_error() -> None:
     assert response.error.category == "validation"
     assert response.error.code == "missing_file"
 
+
+def test_process_route_enforces_size_limit_without_content_length_header() -> None:
+    request = _request_with_body(b"a" * (MAX_FILE_SIZE_BYTES + 1), "image/png")
+    response = asyncio.run(process_image(request))
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.category == "validation"
+    assert response.error.code == "file_too_large"

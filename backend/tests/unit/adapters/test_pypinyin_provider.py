@@ -1,6 +1,9 @@
 """Unit tests for the PyPinyinProvider adapter."""
 
 
+import pytest
+
+from app.adapters.pinyin_provider import PinyinExecutionError
 from app.adapters.pypinyin_provider import PyPinyinProvider
 
 
@@ -41,3 +44,14 @@ def test_generate_pinyin_has_tone_marks() -> None:
     assert any(ord(char) > 127 for char in all_pinyin), (
         "Expected tone-marked Unicode characters in pinyin output"
     )
+
+
+def test_generate_raises_when_provider_output_is_misaligned(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = PyPinyinProvider()
+    monkeypatch.setattr(
+        "app.adapters.pypinyin_provider.pypinyin.pinyin",
+        lambda *_args, **_kwargs: [["nǐ"]],
+    )
+
+    with pytest.raises(PinyinExecutionError, match="malformed output"):
+        provider.generate(text="你好")

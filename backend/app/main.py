@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,9 +7,22 @@ from app.api.v1.router import api_v1_router
 
 app = FastAPI(title="OCR Pinyin API", version="0.1.0")
 
+
+def _get_cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ALLOW_ORIGINS")
+    if configured:
+        parsed = [origin.strip() for origin in configured.split(",") if origin.strip()]
+        if parsed:
+            return parsed
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_get_cors_origins(),
     allow_methods=["POST", "OPTIONS"],
     allow_headers=["*"],
 )
