@@ -139,27 +139,33 @@ FR40: Epic 5 - future Apple ID migration path
 
 ### Epic 1: Foundation & Capture-to-Result Vertical Slice
 Deliver a complete, working first path where Clint can capture/upload a page and receive basic pinyin output via stable /v1 contracts.
+**Depends on:** None (foundational epic)
 **FRs covered:** FR1, FR2, FR3, FR5, FR10, FR12, FR13, FR14, FR15, FR37, FR39
 
 ### Epic 2: Reliable OCR-to-Pinyin Quality & Recovery
 Improve output trust by handling mixed content, uncertainty, partial results, and clear retry/recovery guidance.
+**Depends on:** Epic 1 (starter stack, `/v1/process` baseline, CI quality gates)
 **FRs covered:** FR6, FR7, FR8, FR9, FR11, FR16, FR17, FR18, FR19, FR20
 
 ### Epic 3: Diagnostics, Observability & Operational Confidence
 Enable debugging and runtime visibility with collapsible diagnostics, trace/timing data, and ops endpoints.
+**Depends on:** Epic 1 (request flow foundation), Epic 2 (quality/recovery signal sources)
 **FRs covered:** FR4, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR28
 
 ### Epic 4: Cost Guardrails & Safe Usage Control
 Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+**Depends on:** Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)
 **FRs covered:** FR29, FR30, FR31, FR32
 
 ### Epic 5: History, Reuse & Future Evolution
 Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
+**Depends on:** Epic 1 (core request/response and IDs), Epic 3 (diagnostics payload conventions)
 **FRs covered:** FR33, FR34, FR35, FR36, FR38, FR40
 
 ## Epic 1: Foundation & Capture-to-Result Vertical Slice
 
 Deliver a complete, working first path where Clint can capture/upload a page and receive basic pinyin output via stable /v1 contracts.
+**Depends on:** None (foundational epic)
 
 ### Story 1.1: Set Up Initial Project from Starter Template
 
@@ -179,7 +185,30 @@ So that I can submit an image through a stable MVP path.
 **Then** I can access a clear Take Photo/upload action
 **And** submission posts to POST /v1/process.
 
-### Story 1.2: Validate Uploaded Images and Return Actionable Errors
+### Story 1.2: Establish Baseline CI Quality Gates (Backend + Frontend + Contract)
+
+As Clint,
+I want baseline CI quality gates running early in the project,
+So that regressions are caught before feature expansion and implementation stays consistent.
+
+**Acceptance Criteria:**
+
+**Given** the repository includes backend and frontend apps
+**When** CI runs on pull requests and main branch updates
+**Then** backend lint/test checks execute (Ruff and backend tests)
+**And** frontend lint/test checks execute (ESLint and frontend tests).
+
+**Given** API response envelope conventions are defined
+**When** contract checks run in CI
+**Then** `/v1/process` success/partial/error envelope checks validate required fields (`status`, `request_id`, and `data|warnings|error` as applicable)
+**And** CI fails if required envelope fields are missing or renamed.
+
+**Given** any required quality check fails
+**When** CI completes
+**Then** the pipeline status is failed
+**And** merge is blocked until checks pass.
+
+### Story 1.3: Validate Uploaded Images and Return Actionable Errors
 
 As Clint,
 I want image quality and file constraints validated before OCR,
@@ -197,7 +226,7 @@ So that bad inputs are rejected early with clear retry guidance.
 **Then** processing continues to OCR
 **And** status messaging indicates progress.
 
-### Story 1.3: Extract Chinese Text from Valid Images
+### Story 1.4: Extract Chinese Text from Valid Images
 
 As Clint,
 I want Chinese text extracted from a validated page image,
@@ -207,15 +236,15 @@ So that the system has source text for pinyin conversion.
 
 **Given** a valid uploaded image with Chinese text
 **When** OCR runs
-**Then** extracted Chinese text is produced in structured output
-**And** processing status remains explicit in API/UI.
+**Then** extracted Chinese text is returned in `data.ocr.segments[]` with fields `text`, `language`, and `confidence`
+**And** `status` is one of `success|partial|error` and is shown in both API response and UI state.
 
 **Given** OCR cannot produce usable text
 **When** extraction fails
 **Then** the response returns a structured failure category
 **And** the UI offers immediate retry guidance.
 
-### Story 1.4: Generate Pinyin and Return Unified Result View
+### Story 1.5: Generate Pinyin and Return Unified Result View
 
 As Clint,
 I want pinyin generated from extracted Chinese text and shown with the uploaded image,
@@ -236,6 +265,7 @@ So that I can continue reading immediately.
 ## Epic 2: Reliable OCR-to-Pinyin Quality & Recovery
 
 Improve output trust by handling mixed content, uncertainty, partial results, and clear retry/recovery guidance.
+**Depends on:** Epic 1 (starter stack, `/v1/process` baseline, CI quality gates)
 
 ### Story 2.1: Filter Mixed-Language OCR for Chinese-to-Pinyin Conversion
 
@@ -265,8 +295,8 @@ So that I can follow sentence flow accurately while reading.
 
 **Given** extracted Chinese source segments are available
 **When** pinyin is produced
-**Then** output preserves segment-level alignment to source text
-**And** alignment data is represented consistently in the response model.
+**Then** output preserves segment-level alignment by returning `data.pinyin.segments[]` with `source_text`, `pinyin_text`, and `alignment_status`
+**And** any non-aligned segment sets `alignment_status="uncertain"` and includes `reason_code`.
 
 **Given** some segments cannot be confidently aligned
 **When** response is generated
@@ -283,8 +313,8 @@ So that I still get usable reading help instead of a hard failure.
 
 **Given** processing fails in one stage after earlier stages succeed
 **When** /v1/process completes
-**Then** response status is partial with usable available output
-**And** failure category/code indicates what failed.
+**Then** response uses `status="partial"` when at least one stage succeeds and one stage fails
+**And** `error.category` and `error.code` are populated with typed values from the shared taxonomy.
 
 **Given** a fully unrecoverable error occurs
 **When** response is returned
@@ -312,6 +342,7 @@ So that I can quickly recover and continue reading flow.
 ## Epic 3: Diagnostics, Observability & Operational Confidence
 
 Enable debugging and runtime visibility with collapsible diagnostics, trace/timing data, and ops endpoints.
+**Depends on:** Epic 1 (request flow foundation), Epic 2 (quality/recovery signal sources)
 
 ### Story 3.1: Capture Request Metadata and Structured Diagnostics Payload
 
@@ -388,6 +419,7 @@ So that optional Datadog integration can be added without rework.
 ## Epic 4: Cost Guardrails & Safe Usage Control
 
 Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+**Depends on:** Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)
 
 ### Story 4.1: Estimate Per-Request Processing Cost
 
@@ -464,6 +496,7 @@ So that accidental high-cost requests are prevented.
 ## Epic 5: History, Reuse & Future Evolution
 
 Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
+**Depends on:** Epic 1 (core request/response and IDs), Epic 3 (diagnostics payload conventions)
 
 ### Story 5.1: Store Result Artifacts for Later Retrieval
 
