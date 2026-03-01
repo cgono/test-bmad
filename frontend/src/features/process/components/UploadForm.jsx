@@ -4,6 +4,14 @@ import { useMutation } from '@tanstack/react-query'
 
 import { submitProcessRequest } from '../../../lib/api-client'
 
+const validationGuidanceByCode = {
+  missing_file: 'No photo detected. Tap Take Photo or choose an image to continue.',
+  invalid_mime_type: 'Unsupported file type. Retake or upload a JPG, PNG, or WEBP image.',
+  file_too_large: 'Image is too large. Retake with a lower resolution or upload a smaller file.',
+  image_decode_failed: 'We could not read that image. Retake a clearer photo and try again.',
+  image_too_large_pixels: 'Image dimensions are too large. Retake with lower resolution and retry.',
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const cameraInputRef = useRef(null)
@@ -54,11 +62,16 @@ export default function UploadForm() {
 
       <div style={{ marginTop: '1rem' }}>
         <h2>Processing Status</h2>
-        {!mutation.data && !mutation.error && <p>Waiting for submission.</p>}
-        {mutation.error && <p role="alert">{mutation.error.message}</p>}
+        {!mutation.data && !mutation.error && !mutation.isPending && <p>Waiting for submission.</p>}
+        {mutation.isPending && <p>Uploading image...</p>}
+        {mutation.error && (
+          <p role="alert">
+            {validationGuidanceByCode[mutation.error.code] || mutation.error.message}
+          </p>
+        )}
         {mutation.data && (
           <p>
-            Request path confirmed: {mutation.data.status} ({mutation.data.request_id})
+            Valid image accepted — continuing to OCR processing... ({mutation.data.request_id})
           </p>
         )}
       </div>

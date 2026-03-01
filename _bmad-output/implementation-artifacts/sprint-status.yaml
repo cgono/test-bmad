@@ -43,7 +43,7 @@ development_status:
   epic-1: in-progress
   1-1-set-up-initial-project-from-starter-template: done
   1-2-establish-baseline-ci-quality-gates-backend-frontend-contract: done
-  1-3-validate-uploaded-images-and-return-actionable-errors: backlog
+  1-3-validate-uploaded-images-and-return-actionable-errors: done
   1-4-extract-chinese-text-from-valid-images: backlog
   1-5-generate-pinyin-and-return-unified-result-view: backlog
   epic-1-retrospective: optional

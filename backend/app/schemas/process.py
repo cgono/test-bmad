@@ -16,6 +16,7 @@ class ProcessWarning(BaseModel):
 
 
 class ProcessError(BaseModel):
+    category: str = "processing"
     code: str
     message: str
 
