@@ -43,7 +43,9 @@ def test_extract_chinese_segments_normalizes_fields(monkeypatch: pytest.MonkeyPa
     assert segments[0].confidence == pytest.approx(0.92)
 
 
-def test_extract_chinese_segments_raises_when_no_usable_text(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_extract_chinese_segments_raises_when_no_usable_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "app.services.ocr_service.get_ocr_provider",
         lambda: StubProvider([RawOcrSegment(text="hello", language="en", confidence=99)]),

@@ -76,7 +76,9 @@ async def _build_process_response(
     )
 
 
-def _build_validation_error_response(request_id: str, error: ImageValidationError) -> ProcessResponse:
+def _build_validation_error_response(
+    request_id: str, error: ImageValidationError
+) -> ProcessResponse:
     return ProcessResponse(
         status="error",
         request_id=request_id,

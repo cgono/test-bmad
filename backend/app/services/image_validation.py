@@ -25,7 +25,7 @@ class ValidatedImage:
 class ImageValidationError(Exception):
     """Raised when an uploaded image fails a validation check."""
 
-    def __init__(self, *, code: str, message: str, category: str = VALIDATION_ERROR_CATEGORY) -> None:
+    def __init__(self, *, code: str, message: str, category: str = VALIDATION_ERROR_CATEGORY) -> None:  # noqa: E501
         super().__init__(message)
         self.code = code
         self.message = message

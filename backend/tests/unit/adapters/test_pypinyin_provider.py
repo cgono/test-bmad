@@ -46,7 +46,9 @@ def test_generate_pinyin_has_tone_marks() -> None:
     )
 
 
-def test_generate_raises_when_provider_output_is_misaligned(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_raises_when_provider_output_is_misaligned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     provider = PyPinyinProvider()
     monkeypatch.setattr(
         "app.adapters.pypinyin_provider.pypinyin.pinyin",
