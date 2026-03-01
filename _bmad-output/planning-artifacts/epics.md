@@ -5,8 +5,9 @@ stepsCompleted:
   - step-03-create-stories
   - step-04-final-validation
 inputDocuments:
-  - /Users/clint/Documents/GitHub/test-bmad/_bmad-output/planning-artifacts/prd.md
-  - /Users/clint/Documents/GitHub/test-bmad/_bmad-output/planning-artifacts/architecture.md
+  - /workspaces/test-bmad/_bmad-output/planning-artifacts/prd.md
+  - /workspaces/test-bmad/_bmad-output/planning-artifacts/architecture.md
+  - /workspaces/test-bmad/_bmad-output/planning-artifacts/ux-design-specification.md
 ---
 
 # test-bmad - Epic Breakdown
@@ -64,422 +65,474 @@ FR40: System can support future migration to Apple ID based authentication.
 
 NFR1: End-to-end processing from upload acceptance to pinyin result should complete within 2 seconds for typical phone photos under normal operating conditions.
 NFR2: The system should prioritize output correctness over response speed when tradeoffs occur.
-NFR3: Health and metrics endpoints should respond quickly enough to support live troubleshooting.
-NFR4: The processing pipeline should return a structured outcome for every request: success, partial success, or clear failure.
-NFR5: The system should fail gracefully on low-quality images, OCR uncertainty, or provider/tool errors, with retry guidance.
-NFR6: History and diagnostics data should be persisted reliably for recent sessions.
-NFR7: All network traffic should use TLS in transit.
-NFR8: Uploaded images and derived text artifacts should be stored with access controls appropriate for personal/private usage.
-NFR9: Secrets should be managed outside source code (environment variables or secret store).
-NFR10: The system should support future addition of Apple ID authentication without re-architecting core flows.
-NFR11: The system should track per-request and daily estimated processing cost.
-NFR12: The system should enforce or warn at a daily budget threshold of approximately 1 SGD/day.
-NFR13: The system should apply request size and input constraints to prevent accidental high-cost usage.
-NFR14: The system should expose request timings, OCR confidence indicators, and processing traces for debugging.
-NFR15: The system should emit telemetry compatible with optional Datadog ingestion.
-NFR16: Error events should include reason categories to support rapid root-cause identification.
-NFR17: API contracts should be versioned under /v1 and remain backward compatible for non-breaking changes.
-NFR18: The backend should provide JSON responses for API consumers and support rendered HTML flow for phone web usage.
-NFR19: The design should preserve extensibility for future audio, translation, and personal book-compilation integrations.
+NFR3: The processing pipeline should return a structured outcome for every request: success, partial success, or clear failure.
+NFR4: The system should fail gracefully on low-quality images, OCR uncertainty, or provider/tool errors, with retry guidance.
+NFR5: All network traffic should use TLS in transit, with secrets managed outside source code.
+NFR6: The system should track per-request and daily estimated processing cost, and enforce or warn at approximately 1 SGD/day.
+NFR7: The system should expose timings, confidence indicators, and traces for debugging, and emit telemetry compatible with optional Datadog ingestion.
+NFR8: API contracts should be versioned under /v1 and remain backward compatible for non-breaking changes.
+NFR9: The architecture should preserve extensibility for future audio, translation, and personal book-compilation integrations.
 
 ### Additional Requirements
 
-- Starter template requirement (prominent): initialize implementation with a minimal dual-starter setup using FastAPI backend plus Vite React frontend; this should be Epic 1 Story 1.
-- Backend and frontend should be organized as a split architecture (`backend/` and `frontend/`) with a clean /v1 API boundary.
-- API contracts should use standardized response envelopes (`success`, `partial`, `error`) with `request_id` and optional `job_id` for async-ready evolution.
-- MVP public processing path should be synchronous (`POST /v1/process`) while preserving domain/service decoupling for future async queue execution.
-- Enforce consistent API field naming (`snake_case`) and ISO 8601 UTC datetime formatting.
-- Implement standardized error taxonomy/categories (`validation`, `ocr`, `pinyin`, `system`, `budget`, `upstream`) and avoid raw provider exception leakage.
-- Implement middleware and patterns for request correlation (`request_id`) and structured client-safe error handling.
-- Include operational endpoints (`GET /v1/health`, `GET /v1/metrics`) and diagnostics payload support for troubleshooting.
-- Introduce repository/storage interfaces from day one (for history/artifacts) even though MVP persistence is no-database/ephemeral.
-- Security baseline requirements include localhost-focused CORS allowlist, request size limits, MIME/type validation, environment-based secrets, and TLS when beyond localhost.
-- Keep MVP unauthenticated but include an optional API-key middleware toggle path to ease future hardening.
-- Frontend should use TanStack Query for API server-state and retry/cache behavior.
-- Provide Docker Compose local runtime as baseline developer workflow for backend/frontend orchestration.
-- Ensure architecture preserves extension path for AWS target (S3/CloudFront frontend, Lambda/API Gateway backend, future DynamoDB/S3 persistence) and Terraform IaC later.
-- Enforce cross-agent consistency via naming conventions, API contracts, and contract tests/lint gates (Ruff + Black; ESLint + Prettier).
+- Starter template requirement (critical): initialize implementation with a minimal dual-starter stack using FastAPI backend plus Vite React frontend; this should be the first implementation story.
+- Establish a monorepo-style structure with clear `backend/` and `frontend/` boundaries and a feature-layered internal structure.
+- API contract must use a standardized response envelope (`success`/`partial`/`error`) with `request_id`, typed error categories, and async-ready fields (optional `job_id`).
+- Enforce API naming and payload consistency: versioned `/v1` routes and `snake_case` fields.
+- Include a request correlation and error-handling middleware strategy to avoid raw upstream/provider exceptions leaking to clients.
+- Use repository and storage interfaces from day one to keep MVP no-DB while preserving a migration path to persistent history/artifact stores.
+- Local deployment baseline should be Docker Compose for backend + frontend parity and reduced startup friction.
+- Integrate budget guardrail mechanics with request-size limits, MIME/type validation, and configurable warning/block behavior.
+- Implement diagnostics as first-class output: raw OCR, confidence, timings, and trace details.
+- Frontend state management should use a consistent API-client boundary and query lifecycle pattern (TanStack Query in architecture guidance).
+- UX requirement: iPhone Safari mobile-first design with a single-column, touch-friendly flow.
+- UX requirement: progressive disclosure by default; keep pinyin as primary content and hide technical diagnostics behind explicit `Show Details` toggle.
+- UX requirement: provide clear low-confidence recovery with primary `Retake Photo` and secondary proceed option.
+- UX requirement: maintain continuous reading loop with dominant `Take Photo` then `Next Page` primary actions.
+- Accessibility requirements include WCAG AA contrast, minimum 44x44 tap targets, semantic controls, and non-color-only status communication.
+- Pinyin display preference is tone marks/diacritics by default with numeric-tone fallback where needed.
 
 ### FR Coverage Map
 
-### FR Coverage Map
-
-FR1: Epic 1 - Start flow with photo upload
-FR2: Epic 1 - Validate image quality
-FR3: Epic 1 - Reject invalid images with guidance
-FR4: Epic 3 - Retain upload metadata for diagnostics/history
-FR5: Epic 1 - OCR Chinese text extraction
-FR6: Epic 1 - Ignore non-Chinese text in pinyin generation
-FR7: Epic 2 - Preserve extracted source text
-FR8: Epic 2 - Flag uncertain extraction segments
-FR9: Epic 2 - Support resubmit/retry on low quality
-FR10: Epic 1 - Generate Hanyu Pinyin
-FR11: Epic 1 - Align pinyin with extracted text
-FR12: Epic 1 - Show image and pinyin together
-FR13: Epic 1 - Return JSON output
-FR14: Epic 1 - Return phone-friendly HTML output
-FR15: Epic 1 - Provide processing status/outcome
-FR16: Epic 2 - Use explicit error reason categories
-FR17: Epic 2 - Provide low-confidence fallback guidance
-FR18: Epic 2 - Handle mixed-language pages gracefully
-FR19: Epic 2 - Return partial results when needed
-FR20: Epic 2 - Support user-initiated retry
-FR21: Epic 3 - Collapsible diagnostics panel
-FR22: Epic 3 - Expose raw OCR output
-FR23: Epic 3 - Expose confidence indicators
-FR24: Epic 3 - Expose request timing details
-FR25: Epic 3 - Expose LangChain/tool execution trace
-FR26: Epic 3 - Emit telemetry for optional Datadog
-FR27: Epic 3 - Provide health endpoint
-FR28: Epic 3 - Provide metrics endpoint
-FR29: Epic 3 - Estimate per-request cost
-FR30: Epic 3 - Track daily aggregate cost
-FR31: Epic 3 - Enforce/warn daily budget threshold
-FR32: Epic 3 - Restrict oversized/high-cost inputs
-FR33: Epic 4 - Retrieve recent history
-FR34: Epic 4 - Retrieve history item by id
-FR35: Epic 4 - Store artifacts for later review
-FR36: Epic 4 - Support future saved-book compilation
-FR37: Epic 1 - Versioned /v1 processing APIs
-FR38: Epic 4 - Versioned /v1 history APIs
+FR1: Epic 1 - photo upload entry
+FR2: Epic 1 - image quality validation
+FR3: Epic 1 - invalid-image rejection with guidance
+FR4: Epic 3 - upload metadata retention for diagnostics/history
+FR5: Epic 1 - Chinese OCR extraction baseline
+FR6: Epic 2 - non-Chinese filtering for pinyin generation
+FR7: Epic 2 - preserve extracted source text
+FR8: Epic 2 - uncertainty indication
+FR9: Epic 2 - retry/resubmit flow
+FR10: Epic 1 - Hanyu Pinyin generation baseline
+FR11: Epic 2 - alignment of pinyin with extracted text
+FR12: Epic 1 - unified result view (image + pinyin)
+FR13: Epic 1 - JSON API output
+FR14: Epic 1 - phone-friendly HTML output
+FR15: Epic 1 - processing status and completion outcome
+FR16: Epic 2 - explicit failure reason categories
+FR17: Epic 2 - low-confidence fallback guidance
+FR18: Epic 2 - mixed-language robustness
+FR19: Epic 2 - partial-result behavior
+FR20: Epic 2 - user-initiated retry in same flow
+FR21: Epic 3 - collapsible diagnostics panel
+FR22: Epic 3 - raw OCR visibility
+FR23: Epic 3 - confidence indicators exposure
+FR24: Epic 3 - per-request timing details
+FR25: Epic 3 - LangChain/tool trace exposure
+FR26: Epic 3 - telemetry emission for optional Datadog
+FR27: Epic 3 - health endpoint
+FR28: Epic 3 - metrics endpoint
+FR29: Epic 4 - per-request cost estimation
+FR30: Epic 4 - daily aggregate cost tracking
+FR31: Epic 4 - budget threshold warn/enforce
+FR32: Epic 4 - oversized/expensive input constraints
+FR33: Epic 5 - recent history retrieval
+FR34: Epic 5 - specific history item retrieval
+FR35: Epic 5 - result artifact storage for later review
+FR36: Epic 5 - extension path to saved-book workflows
+FR37: Epic 1 - versioned /v1 processing capability
+FR38: Epic 5 - versioned /v1 history capability
 FR39: Epic 1 - MVP no-auth operation
-FR40: Epic 4 - Future Apple ID migration support
+FR40: Epic 5 - future Apple ID migration path
 
 ## Epic List
 
-### Epic 1: Launch the Core Reading Assistant
-User can upload a photo and get usable pinyin output in one phone-friendly flow (JSON + HTML), with versioned API baseline and MVP access model.
-**FRs covered:** FR1, FR2, FR3, FR5, FR6, FR10, FR11, FR12, FR13, FR14, FR15, FR37, FR39
+### Epic 1: Foundation & Capture-to-Result Vertical Slice
+Deliver a complete, working first path where Clint can capture/upload a page and receive basic pinyin output via stable /v1 contracts.
+**FRs covered:** FR1, FR2, FR3, FR5, FR10, FR12, FR13, FR14, FR15, FR37, FR39
 
-### Epic 2: Build Reliable Processing and Recovery
-User gets dependable behavior on imperfect input through confidence-aware extraction, partial results, clear errors, and retry flow.
-**FRs covered:** FR7, FR8, FR9, FR16, FR17, FR18, FR19, FR20
+### Epic 2: Reliable OCR-to-Pinyin Quality & Recovery
+Improve output trust by handling mixed content, uncertainty, partial results, and clear retry/recovery guidance.
+**FRs covered:** FR6, FR7, FR8, FR9, FR11, FR16, FR17, FR18, FR19, FR20
 
-### Epic 3: Add Diagnostics, Observability, and Cost Guardrails
-User can troubleshoot quality/performance issues and keep operational/cost control during daily use.
-**FRs covered:** FR4, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR28, FR29, FR30, FR31, FR32
+### Epic 3: Diagnostics, Observability & Operational Confidence
+Enable debugging and runtime visibility with collapsible diagnostics, trace/timing data, and ops endpoints.
+**FRs covered:** FR4, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR28
 
-### Epic 4: Enable History and Future Evolution
-User can retrieve prior sessions/results while the system preserves extension paths (saved-book workflows and future auth migration).
+### Epic 4: Cost Guardrails & Safe Usage Control
+Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+**FRs covered:** FR29, FR30, FR31, FR32
+
+### Epic 5: History, Reuse & Future Evolution
+Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
 **FRs covered:** FR33, FR34, FR35, FR36, FR38, FR40
 
-## Epic 1: Launch the Core Reading Assistant
+## Epic 1: Foundation & Capture-to-Result Vertical Slice
 
-Deliver a complete first-use experience where a user uploads a photo and receives pinyin output through stable `/v1` APIs and phone-friendly rendering.
+Deliver a complete, working first path where Clint can capture/upload a page and receive basic pinyin output via stable /v1 contracts.
 
-### Story 1.1: Set up initial project from starter template
+### Story 1.1: Set Up Initial Project from Starter Template
 
-As a solo builder,
-I want the project scaffolded with FastAPI backend and Vite React frontend,
-So that implementation starts from a consistent architecture baseline.
-
-**FRs:** FR37, FR39
+As Clint,
+I want the project initialized from the selected FastAPI + Vite starter template with a /v1/process entrypoint and phone upload screen,
+So that I can submit an image through a stable MVP path.
 
 **Acceptance Criteria:**
 
-**Given** a new repository state
-**When** the scaffold setup is executed
-**Then** `backend/` and `frontend/` applications exist and run locally
-**And** API routing supports a `/v1` prefix with no auth required in MVP.
+**Given** a fresh repo and environment
+**When** the app stack is started locally
+**Then** frontend and backend run with documented startup commands
+**And** /v1 routing is active with unauthenticated MVP access.
 
-**Given** the baseline architecture requirements
-**When** project structure is reviewed
-**Then** backend and frontend boundaries match the architecture document
-**And** starter scaffolding supports future Docker Compose use.
+**Given** iPhone Safari opens the app
+**When** I land on the initial screen
+**Then** I can access a clear Take Photo/upload action
+**And** submission posts to POST /v1/process.
 
-### Story 1.2: Implement Upload Intake and Image Validation
+### Story 1.2: Validate Uploaded Images and Return Actionable Errors
 
-As a user reading with my phone,
-I want to upload a page image and receive immediate validation feedback,
-So that only usable images proceed to OCR.
-
-**FRs:** FR1, FR2, FR3
+As Clint,
+I want image quality and file constraints validated before OCR,
+So that bad inputs are rejected early with clear retry guidance.
 
 **Acceptance Criteria:**
 
-**Given** a valid image upload
-**When** I submit it to `POST /v1/process`
-**Then** the request is accepted and image metadata is captured
-**And** processing moves to extraction flow.
+**Given** an uploaded image that fails format/size/readability checks
+**When** /v1/process receives it
+**Then** the API returns a structured validation failure
+**And** the UI shows actionable guidance to retake/reupload.
 
-**Given** an unreadable or invalid file
-**When** I submit it
-**Then** the API returns a structured validation error
-**And** the response includes actionable retry guidance.
+**Given** a valid image
+**When** validation succeeds
+**Then** processing continues to OCR
+**And** status messaging indicates progress.
 
-### Story 1.3: Extract Chinese Text and Generate Pinyin
+### Story 1.3: Extract Chinese Text from Valid Images
 
-As a user,
-I want Chinese text extracted and converted to Hanyu Pinyin,
-So that I can continue reading correctly.
-
-**FRs:** FR5, FR6, FR10, FR11
+As Clint,
+I want Chinese text extracted from a validated page image,
+So that the system has source text for pinyin conversion.
 
 **Acceptance Criteria:**
 
-**Given** a valid uploaded image containing Chinese text
-**When** processing executes
-**Then** OCR extracts Chinese characters
-**And** non-Chinese text is excluded from pinyin conversion by default.
+**Given** a valid uploaded image with Chinese text
+**When** OCR runs
+**Then** extracted Chinese text is produced in structured output
+**And** processing status remains explicit in API/UI.
 
-**Given** extracted Chinese text
-**When** pinyin conversion runs
-**Then** pinyin output is returned aligned with source text
-**And** output is structured for downstream display.
+**Given** OCR cannot produce usable text
+**When** extraction fails
+**Then** the response returns a structured failure category
+**And** the UI offers immediate retry guidance.
 
-### Story 1.4: Deliver JSON and HTML Result Views
+### Story 1.4: Generate Pinyin and Return Unified Result View
 
-As a user,
-I want both API JSON output and a phone-friendly HTML result view,
-So that I can use the same backend for direct reading and integrations.
-
-**FRs:** FR12, FR13, FR14, FR15
+As Clint,
+I want pinyin generated from extracted Chinese text and shown with the uploaded image,
+So that I can continue reading immediately.
 
 **Acceptance Criteria:**
 
-**Given** a successful processing request
-**When** I call the API programmatically
-**Then** I receive a JSON response with `status`, `request_id`, and `data`
-**And** field naming follows `snake_case`.
+**Given** OCR extracted Chinese text
+**When** pinyin generation runs
+**Then** the API returns pinyin in a structured JSON response
+**And** HTML output presents image plus pinyin in one view.
 
-**Given** a browser-based phone flow
-**When** processing completes
-**Then** the rendered page shows uploaded image and generated pinyin together
-**And** completion status is clearly visible.
+**Given** processing completes successfully
+**When** I view the result
+**Then** completion state is clearly indicated
+**And** response shape remains versioned under /v1 with no auth required for MVP.
 
-## Epic 2: Build Reliable Processing and Recovery
+## Epic 2: Reliable OCR-to-Pinyin Quality & Recovery
 
-Deliver resilient behavior for imperfect real-world inputs through confidence signaling, partial results, categorized errors, and retry-friendly flow.
+Improve output trust by handling mixed content, uncertainty, partial results, and clear retry/recovery guidance.
 
-### Story 2.1: Preserve Source Text and Confidence Signals
+### Story 2.1: Filter Mixed-Language OCR for Chinese-to-Pinyin Conversion
 
-As a user validating output quality,
-I want to see extracted text with confidence indicators,
-So that I can judge whether results are trustworthy.
-
-**FRs:** FR7, FR8
+As Clint,
+I want non-Chinese OCR content filtered before pinyin conversion,
+So that generated pronunciation output focuses on relevant Chinese text.
 
 **Acceptance Criteria:**
 
-**Given** OCR extraction completes
-**When** response payload is built
-**Then** extracted source text is included in results
-**And** uncertain segments are explicitly marked.
+**Given** OCR output contains Chinese and non-Chinese segments
+**When** conversion preprocessing runs
+**Then** non-Chinese segments are excluded from pinyin generation
+**And** retained source text remains available for review.
 
-**Given** low-confidence extraction
-**When** results are returned
-**Then** the user sees warning-level confidence messaging
-**And** guidance is provided for retaking the photo.
+**Given** OCR output is primarily non-Chinese
+**When** filtering completes
+**Then** the system returns a structured recoverable response
+**And** guidance indicates how to retake for better Chinese capture.
 
-### Story 2.2: Implement Structured Failure Taxonomy
+### Story 2.2: Align Pinyin Output with Source Text Segments
 
-As a user troubleshooting failures,
-I want explicit, categorized errors,
-So that I can take the right recovery action quickly.
-
-**FRs:** FR16, FR17
+As Clint,
+I want pinyin output aligned to extracted source segments,
+So that I can follow sentence flow accurately while reading.
 
 **Acceptance Criteria:**
 
-**Given** a processing failure
-**When** the API responds
-**Then** error payload includes standardized category and code
-**And** provider-internal exception details are not leaked.
+**Given** extracted Chinese source segments are available
+**When** pinyin is produced
+**Then** output preserves segment-level alignment to source text
+**And** alignment data is represented consistently in the response model.
 
-**Given** different failure classes (`validation`, `ocr`, `pinyin`, `budget`, `upstream`, `system`)
-**When** each is triggered
-**Then** the response message is actionable and consistent
-**And** status envelope shape remains stable.
+**Given** some segments cannot be confidently aligned
+**When** response is generated
+**Then** uncertain segments are explicitly marked
+**And** remaining aligned segments are still returned.
 
-### Story 2.3: Support Partial Results for Mixed/Uncertain Pages
+### Story 2.3: Return Partial Results with Explicit Failure Categories
 
-As a user with complex book pages,
-I want partial output instead of complete failure,
-So that I can still continue reading with best available data.
-
-**FRs:** FR18, FR19
+As Clint,
+I want the system to return partial outcomes when full processing is not possible,
+So that I still get usable reading help instead of a hard failure.
 
 **Acceptance Criteria:**
 
-**Given** mixed-language or partially recognized input
-**When** full extraction is not possible
-**Then** response status is `partial`
-**And** successfully extracted text and pinyin are still returned.
+**Given** processing fails in one stage after earlier stages succeed
+**When** /v1/process completes
+**Then** response status is partial with usable available output
+**And** failure category/code indicates what failed.
 
-**Given** partial completion
-**When** output is displayed
-**Then** limitations are clearly explained
-**And** user receives recommended next steps.
+**Given** a fully unrecoverable error occurs
+**When** response is returned
+**Then** error envelope uses defined reason categories
+**And** user-facing messaging remains actionable and concise.
 
-### Story 2.4: Add User-Initiated Retry Path
+### Story 2.4: Add Low-Confidence Guidance and In-Flow Retry
 
-As a user,
-I want a direct retry path from the same flow,
-So that I can quickly resubmit improved images.
-
-**FRs:** FR9, FR20
+As Clint,
+I want low-confidence outputs to include clear retake guidance and retry actions,
+So that I can quickly recover and continue reading flow.
 
 **Acceptance Criteria:**
 
-**Given** a failed or low-confidence result
-**When** I choose retry
-**Then** I can resubmit from the same interface
-**And** a new processing request is started cleanly.
+**Given** OCR confidence falls below configured threshold
+**When** result is rendered
+**Then** UI shows low-confidence guidance with primary Retake Photo action
+**And** secondary option to proceed with current result is available.
 
-**Given** repeated retries
-**When** each request completes
-**Then** each run has its own request identifier
-**And** results are isolated per attempt.
+**Given** user chooses retry
+**When** retake is submitted from the same flow
+**Then** processing restarts without requiring unrelated navigation
+**And** completion/partial/error state is shown again clearly.
 
-## Epic 3: Add Diagnostics, Observability, and Cost Guardrails
+## Epic 3: Diagnostics, Observability & Operational Confidence
 
-Provide transparent diagnostics and operational controls so quality, performance, and spend remain visible and manageable.
+Enable debugging and runtime visibility with collapsible diagnostics, trace/timing data, and ops endpoints.
 
-### Story 3.1: Expose Diagnostics Panel and Raw OCR Data
+### Story 3.1: Capture Request Metadata and Structured Diagnostics Payload
 
-As a user debugging quality issues,
-I want a collapsible diagnostics panel with raw OCR output,
-So that I can identify whether failures come from extraction or conversion.
-
-**FRs:** FR21, FR22, FR23
+As Clint,
+I want each processing request to capture metadata and diagnostics context,
+So that I can troubleshoot quality issues and review runs later.
 
 **Acceptance Criteria:**
 
-**Given** any processed request
-**When** I open diagnostics
-**Then** raw OCR text is visible
-**And** confidence indicators are included.
+**Given** a processing request is received
+**When** request handling begins and ends
+**Then** request metadata (including request correlation id and upload context) is captured
+**And** diagnostics payload sections are generated in a consistent structure.
 
-**Given** normal usage view
-**When** diagnostics are not needed
-**Then** diagnostics remain collapsed by default
-**And** primary reading result stays uncluttered.
+**Given** processing succeeds, partially succeeds, or fails
+**When** response is returned
+**Then** diagnostics structure remains present/consistent per status policy
+**And** sensitive internals are not leaked in user-facing error text.
 
-### Story 3.2: Add Timing and Trace Diagnostics
+### Story 3.2: Expose Collapsible Result-Page Diagnostics
 
-As a user learning LangChain orchestration,
-I want request timing and tool-trace details,
-So that I can understand performance and pipeline behavior.
-
-**FRs:** FR24, FR25
+As Clint,
+I want diagnostics available behind a Show Details panel,
+So that I can inspect OCR/confidence/timing/trace only when needed.
 
 **Acceptance Criteria:**
 
-**Given** a processed request
-**When** diagnostics are returned
-**Then** total and stage-level timings are available
-**And** trace metadata is associated with `request_id`.
+**Given** a result is displayed
+**When** I do not expand details
+**Then** pinyin output remains primary and unobstructed
+**And** diagnostics stay hidden by default.
 
-**Given** a troubleshooting scenario
-**When** diagnostics are reviewed
-**Then** execution path details are sufficient to isolate bottlenecks
-**And** trace output is structured for future telemetry ingestion.
+**Given** I expand Show Details
+**When** panel opens
+**Then** raw OCR output, confidence indicators, request timing, and trace summary are visible
+**And** collapsing restores quiet reading-focused view.
 
-### Story 3.3: Implement Health, Metrics, and Telemetry Hooks
+### Story 3.3: Add Health and Metrics Endpoints
 
-As an operator of the app,
-I want health and metrics endpoints with telemetry emissions,
-So that system behavior is observable and monitorable.
-
-**FRs:** FR26, FR27, FR28
+As Clint,
+I want operational endpoints for service health and metrics,
+So that I can monitor runtime behavior and troubleshoot quickly.
 
 **Acceptance Criteria:**
 
-**Given** service is running
-**When** `GET /v1/health` is called
-**Then** it returns service readiness status
-**And** response remains lightweight for quick checks.
+**Given** backend is running
+**When** GET /v1/health is called
+**Then** it returns structured service status suitable for uptime checks
+**And** failure states are represented clearly.
 
-**Given** operational monitoring
-**When** `GET /v1/metrics` is called
-**Then** usage/error/performance metrics are returned
-**And** emitted telemetry is compatible with optional Datadog integration.
+**Given** GET /v1/metrics is called
+**When** operational counters/timings are requested
+**Then** structured metrics are returned for local monitoring use
+**And** response format stays consistent with versioned API conventions.
 
-### Story 3.4: Add Budget Guardrails and Input Cost Protection
+### Story 3.4: Emit Telemetry for Optional Datadog-Compatible Ingestion
 
-As a cost-conscious user,
-I want per-request and daily budget guardrails,
-So that prototype usage stays within the target spend.
-
-**FRs:** FR4, FR29, FR30, FR31, FR32
+As Clint,
+I want usage/error telemetry emitted in a consistent schema,
+So that optional Datadog integration can be added without rework.
 
 **Acceptance Criteria:**
 
-**Given** each processing request
-**When** execution completes
-**Then** estimated per-request cost is calculated
-**And** daily aggregate usage is updated.
+**Given** processing requests execute across success/partial/error paths
+**When** telemetry events are emitted
+**Then** they include key fields (request id, status category, timing, error category where applicable)
+**And** schema stays consistent for downstream ingestion adapters.
 
-**Given** daily usage reaches configured threshold
-**When** a new request arrives
-**Then** system warns or blocks per policy
-**And** response clearly explains budget state.
+**Given** telemetry destination is unavailable or disabled
+**When** emission is attempted
+**Then** core processing flow still completes
+**And** telemetry failures do not break user responses.
 
-**Given** oversized or risky input files
-**When** they are submitted
-**Then** request is constrained or rejected before expensive processing
-**And** the user receives corrective guidance.
+## Epic 4: Cost Guardrails & Safe Usage Control
 
-## Epic 4: Enable History and Future Evolution
+Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
 
-Introduce history retrieval and architecture seams that support later saved-book and authentication evolution without rework.
+### Story 4.1: Estimate Per-Request Processing Cost
 
-### Story 4.1: Store and Retrieve Recent Processing History
-
-As a user,
-I want to view recent processed sessions,
-So that I can revisit prior results during reading.
-
-**FRs:** FR33, FR35
+As Clint,
+I want each processing request to include an estimated cost value,
+So that I can understand spend impact per page.
 
 **Acceptance Criteria:**
 
-**Given** completed processing runs
-**When** I call `GET /v1/history`
-**Then** recent entries are returned in a stable response envelope
-**And** each entry includes identifiers and summary metadata.
+**Given** a processing request completes (success/partial/error where estimable)
+**When** response is prepared
+**Then** estimated request cost is calculated using configured rules
+**And** cost value is returned in a consistent diagnostics/metrics field.
 
-**Given** MVP storage constraints
-**When** history is implemented
-**Then** repository interfaces abstract persistence
-**And** current implementation can remain ephemeral/in-memory.
+**Given** cost cannot be fully computed due to missing provider signals
+**When** estimate fallback is used
+**Then** response indicates estimate confidence/fallback mode
+**And** processing result still returns normally.
 
-### Story 4.2: Retrieve Detailed History Records by ID
+### Story 4.2: Track Daily Aggregate Usage Cost
 
-As a user,
-I want to fetch a specific prior result,
-So that I can inspect exact output and diagnostics from earlier runs.
-
-**FRs:** FR34, FR38
+As Clint,
+I want daily cumulative cost tracked across requests,
+So that I can monitor spend against my daily budget target.
 
 **Acceptance Criteria:**
 
-**Given** a valid history identifier
-**When** I call `GET /v1/history/{id}`
-**Then** detailed record data is returned
-**And** includes required artifacts for later review.
+**Given** each processing request finishes
+**When** cost accounting is updated
+**Then** the system increments daily aggregate usage for current date window
+**And** daily totals are queryable for operational visibility.
 
-**Given** an unknown identifier
-**When** lookup is attempted
-**Then** API returns a structured not-found error
-**And** error format matches shared taxonomy.
+**Given** date window rolls over
+**When** new-day requests begin
+**Then** aggregation resets/segments to the new day correctly
+**And** prior-day values remain available for recent review policy.
 
-### Story 4.3: Preserve Future Extension Contracts
+### Story 4.3: Enforce or Warn on Daily Budget Threshold
 
-As the system owner,
-I want stable contracts for future saved-book workflows and auth migration,
-So that post-MVP features can be added without breaking existing flows.
-
-**FRs:** FR36, FR40
+As Clint,
+I want configurable budget-threshold warning/enforcement behavior,
+So that I avoid accidental overspend beyond the daily limit.
 
 **Acceptance Criteria:**
 
-**Given** current `/v1` API contracts
-**When** extension seams are reviewed
-**Then** history and processing models include fields/interfaces needed for saved-book evolution
-**And** no breaking change is required for near-term expansion.
+**Given** daily aggregate approaches configured threshold
+**When** incoming request is evaluated
+**Then** system can issue warning state before hard limit
+**And** warning is visible in response/UI messaging.
 
-**Given** future Apple ID authentication plans
-**When** architecture is implemented
-**Then** MVP remains unauthenticated
-**And** integration path for later auth is explicitly preserved in boundaries/config.
+**Given** threshold is exceeded and enforcement mode is enabled
+**When** request is submitted
+**Then** system blocks further expensive processing with structured budget category response
+**And** user receives clear guidance on next steps.
+
+### Story 4.4: Restrict Oversized or High-Cost Inputs
+
+As Clint,
+I want oversized or risky uploads constrained up front,
+So that accidental high-cost requests are prevented.
+
+**Acceptance Criteria:**
+
+**Given** an upload exceeds configured size/type/policy constraints
+**When** request intake validation runs
+**Then** request is rejected with structured validation/budget-safe error
+**And** message includes concrete corrective guidance.
+
+**Given** an upload is within safe bounds
+**When** intake validation completes
+**Then** request proceeds to processing pipeline
+**And** guardrail checks are logged for audit/diagnostic context.
+
+## Epic 5: History, Reuse & Future Evolution
+
+Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
+
+### Story 5.1: Store Result Artifacts for Later Retrieval
+
+As Clint,
+I want each processed result stored with required artifacts and identifiers,
+So that I can review prior outputs later.
+
+**Acceptance Criteria:**
+
+**Given** a processing run finishes
+**When** persistence adapter is invoked
+**Then** result artifacts required for later review are stored with a unique id
+**And** stored record includes minimal metadata needed for listing and detail retrieval.
+
+**Given** storage operation fails
+**When** response is generated
+**Then** failure is handled with structured category and safe fallback behavior
+**And** primary processing response contract remains valid.
+
+### Story 5.2: Retrieve Recent History List
+
+As Clint,
+I want a recent history endpoint under /v1,
+So that I can quickly access prior processed pages.
+
+**Acceptance Criteria:**
+
+**Given** stored result records exist
+**When** GET /v1/history is called
+**Then** recent history entries are returned in stable, versioned response format
+**And** list entries contain identifiers and summary metadata.
+
+**Given** no history exists
+**When** endpoint is called
+**Then** response returns an empty list (not error)
+**And** format remains consistent.
+
+### Story 5.3: Retrieve Specific Historical Result by Identifier
+
+As Clint,
+I want a detail endpoint for a single prior result,
+So that I can reopen exact output and diagnostics context.
+
+**Acceptance Criteria:**
+
+**Given** a valid history id
+**When** GET /v1/history/{id} is called
+**Then** matching stored result and associated review artifacts are returned
+**And** payload shape is consistent with versioned contract rules.
+
+**Given** requested id does not exist
+**When** endpoint is called
+**Then** API returns structured not-found category response
+**And** error message is clear and actionable.
+
+### Story 5.4: Define Extension Seams for Saved-Book Workflow and Apple ID Migration
+
+As Clint,
+I want explicit extension contracts for saved-book compilation and future Apple ID auth,
+So that MVP implementation can evolve without major refactors.
+
+**Acceptance Criteria:**
+
+**Given** MVP history and process modules are implemented
+**When** extension interfaces/contracts are defined
+**Then** saved-book workflow integration points are documented in code/docs
+**And** history model supports future grouping into book-level collections.
+
+**Given** MVP runs without authentication
+**When** auth extension seam is added
+**Then** API and middleware boundaries support future Apple ID-based auth integration
+**And** current unauthenticated MVP behavior remains unchanged.
