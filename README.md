@@ -5,6 +5,7 @@ Baseline monorepo for Story 1.1 using FastAPI backend and Vite + React frontend.
 ## Prerequisites
 
 - Python 3.12+
+- uv
 - Node.js 24+
 - npm 11+
 
@@ -14,10 +15,8 @@ Baseline monorepo for Story 1.1 using FastAPI backend and Vite + React frontend.
 
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv sync --project . --dev
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Frontend
@@ -45,7 +44,7 @@ docker compose up --build
 
 ```bash
 cd backend
-pytest
+uv run pytest
 ```
 
 ### Frontend smoke tests

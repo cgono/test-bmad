@@ -1,148 +1,194 @@
 # Sprint Change Proposal
 
-Date: 2026-03-01
-Project: test-bmad
-Mode: Incremental
+## 1. Issue Summary
 
-## 1) Issue Summary
+### Trigger
+During implementation (Story 1.1 project setup/bootstrap), a tooling gap was identified: backend dependency management currently uses `pip` with `requirements.txt`/`requirements-dev.txt`.
 
-A readiness review identified planning-quality gaps that should be corrected before implementation scales:
-- Missing early CI/CD quality-gate story in early epic sequence for a greenfield setup.
-- Several acceptance criteria are not measurably bounded (use terms like "structured"/"consistent" without schema-level checks).
-- Cross-epic dependency assumptions are implicit rather than explicitly documented.
+### Problem Statement
+Current setup does not provide the preferred repo-local, lockfile-driven workflow for reproducible backend environments and does not optimize install/sync speed. The requested correction is to adopt the `uv` package manager for backend dependency management and runtime commands.
 
-Trigger context:
-- Source artifact: `_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-01.md`
-- Discovery point: pre-implementation readiness assessment
+### Evidence
+- Backend dependency files currently present:
+  - `backend/requirements.txt`
+  - `backend/requirements-dev.txt`
+- Backend tooling file currently lacks dependency declarations:
+  - `backend/pyproject.toml` (tooling-only currently)
+- Startup docs currently use `pip`:
+  - `README.md` backend instructions use `pip install -r requirements.txt`
+- Container startup currently uses `pip`:
+  - `docker-compose.yml` backend command runs `pip install -r requirements.txt`
+- No `backend/uv.lock` currently exists.
 
-## 2) Impact Analysis
+## 2. Impact Analysis
 
 ### Epic Impact
-- **Epic 1**: Requires scope adjustment to add a baseline CI quality-gate story early in sequence.
-- **Epics 2-5**: No scope redefinition required, but dependency notes must be explicit.
+- Affected epic: **Epic 1: Foundation & Capture-to-Result Vertical Slice**
+- Impact type: refinement of setup/tooling implementation details.
+- Outcome: Epic remains valid and in-sequence; no new epic needed.
 
 ### Story Impact
-- Existing Epic 1 story numbering shifts due to inserted CI story.
-- Selected stories in Epic 1 and Epic 2 require measurable acceptance-criteria refinements.
+- Primary impacted story: **Story 1.1 Set Up Initial Project from Starter Template**
+- Secondary impact: all backend implementation stories should use consistent `uv` commands for local dev/CI/docs.
 
 ### Artifact Conflicts
-- **epics.md**: Primary artifact requiring updates (new story, dependency notes, measurable AC language).
-- **architecture.md**: No mandatory structural rewrite, but the CI quality-gate intent now becomes explicitly represented in epic/stories.
-- **ux-design-specification.md**: No mandatory rewrite in this change set; measurable AC updates reduce interpretation drift against UX intent.
+- PRD: no conflict (no product requirement change).
+- Architecture: initialization command guidance currently shows `pip`; requires update to `uv`.
+- UX: no impact.
+- Technical artifacts needing updates:
+  - `backend/pyproject.toml`
+  - `backend/requirements.txt` and `backend/requirements-dev.txt` (replace or deprecate)
+  - `backend/uv.lock` (new)
+  - `README.md`
+  - `docker-compose.yml`
 
 ### Technical Impact
-- Introduces early CI requirement coverage (backend lint/tests, frontend lint/tests, API envelope contract checks).
-- Reduces risk of regression and cross-agent inconsistency by enforcing contract shape early.
-- No rollback or MVP scope reduction needed.
+- Code/runtime behavior of `/v1` endpoints unchanged.
+- Build/run workflow changes for backend contributors and local containers.
+- Improves reproducibility and install/sync performance.
 
-## 3) Recommended Approach
+## 3. Recommended Approach
 
-Selected path: **Direct Adjustment (Option 1)**
+### Selected Path
+**Direct Adjustment** (Option 1)
+
+### Why
+- Lowest-effort, lowest-risk path.
+- Directly addresses stated goals (repo-local environment + faster installs).
+- No product-scope or UX changes required.
+
+### Effort / Risk / Timeline
+- Effort: **Low**
+- Risk: **Low**
+- Timeline impact: **Minimal** (same sprint, no resequencing required)
+
+## 4. Detailed Change Proposals
+
+### 4.1 Story Change (Approved)
+
+Story: **1.1 Set Up Initial Project from Starter Template**
+Section: setup and implementation details
+
+OLD:
+- Backend setup references `python -m venv`, `pip install -r requirements.txt`
+- Dependency source is `requirements.txt` + `requirements-dev.txt`
+- Docker backend startup installs with `pip install -r requirements.txt`
+
+NEW:
+- Backend setup uses `uv`-managed project environment and sync flow.
+- Dependencies are declared in `backend/pyproject.toml` (project + groups).
+- Lockfile is committed as `backend/uv.lock`.
+- Local setup uses `uv sync`; runtime uses `uv run ...`.
+- Docker backend startup uses `uv sync` then `uv run uvicorn ...`.
 
 Rationale:
-- Resolves all identified issues with targeted artifact edits.
-- Preserves MVP scope, epic order, and timeline assumptions.
-- Lowest-risk correction with high readiness gain.
+- Enforces repo-local reproducibility and improves install/sync speed.
 
-Effort estimate: **Low-Medium**
-Risk assessment: **Low**
-Timeline impact: **Minimal** (planning artifact updates before implementation expansion)
+### 4.2 PRD Change (Approved)
 
-## 4) Detailed Change Proposals
+Artifact: **PRD**
+Section: none
 
-### A) Stories (Epic 1)
+OLD:
+- No explicit backend package-manager requirement.
 
-#### A.1 Add missing early CI/CD quality-gate story and resequence Epic 1 stories
+NEW:
+- No PRD text changes.
 
-**Artifact:** `_bmad-output/planning-artifacts/epics.md`
+Rationale:
+- Package manager choice is implementation-level, not product requirement.
 
-**OLD**
-- Story 1.1: Set Up Initial Project from Starter Template
-- Story 1.2: Validate Uploaded Images and Return Actionable Errors
-- Story 1.3: Extract Chinese Text from Valid Images
-- Story 1.4: Generate Pinyin and Return Unified Result View
+### 4.3 Architecture Change (Approved)
 
-**NEW**
-- Story 1.1: Set Up Initial Project from Starter Template
-- Story 1.2: Establish Baseline CI Quality Gates (Backend + Frontend + Contract)
-- Story 1.3: Validate Uploaded Images and Return Actionable Errors
-- Story 1.4: Extract Chinese Text from Valid Images
-- Story 1.5: Generate Pinyin and Return Unified Result View
+Artifact: **Architecture**
+Section: Starter Template Evaluation -> Initialization Command
 
-**New Story 1.2 Acceptance Criteria**
-- CI runs on pull requests and main updates.
-- Backend checks execute (Ruff + backend tests).
-- Frontend checks execute (ESLint + frontend tests).
-- Contract checks validate `/v1/process` envelope required fields (`status`, `request_id`, and `data|warnings|error` as applicable).
-- CI fails and blocks merge when quality gates fail.
+OLD:
+```bash
+# backend
+python -m venv .venv
+source .venv/bin/activate
+pip install "fastapi[standard]"
+```
 
-**Rationale**
-Adds the missing greenfield quality gate at the earliest practical point and enforces implementation consistency.
+NEW:
+```bash
+# backend
+uv sync
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-### B) Epic Overview Metadata
+Additional architecture note:
+- Backend dependency management standard is `uv` with `pyproject.toml` + committed `uv.lock`.
 
-#### B.1 Add explicit `Depends on` notes for each epic
+Rationale:
+- Aligns architecture guidance with desired and implemented workflow.
 
-**Artifact:** `_bmad-output/planning-artifacts/epics.md`
-
-**OLD**
-- Epic overviews contain title, description, and FR coverage only.
-
-**NEW**
-- Epic 1: `Depends on: None (foundational epic)`
-- Epic 2: `Depends on: Epic 1 (starter stack, /v1/process baseline, CI quality gates)`
-- Epic 3: `Depends on: Epic 1 (request flow foundation), Epic 2 (quality/recovery signal sources)`
-- Epic 4: `Depends on: Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)`
-- Epic 5: `Depends on: Epic 1 (core request/response and IDs), Epic 3 (diagnostics payload conventions)`
-
-**Rationale**
-Makes sequencing assumptions explicit and reduces planning ambiguity.
-
-### C) Acceptance Criteria Precision
-
-#### C.1 Tighten schema-level measurability in selected stories
-
-**Artifact:** `_bmad-output/planning-artifacts/epics.md`
-
-**Story 1.3 (old -> new)**
-- OLD: "extracted Chinese text is produced in structured output"
-- NEW: extracted text returned in `data.ocr.segments[]` with fields `text`, `language`, `confidence`; `status` must be one of `success|partial|error` in API response and reflected in UI state.
-
-**Story 2.2 (old -> new)**
-- OLD: "alignment data is represented consistently"
-- NEW: return `data.pinyin.segments[]` with `source_text`, `pinyin_text`, `alignment_status`; uncertain alignment requires `alignment_status="uncertain"` and `reason_code`.
-
-**Story 2.3 (old -> new)**
-- OLD: "status is partial with usable output; failure category/code indicates what failed"
-- NEW: use `status="partial"` when at least one stage succeeds and one fails; `error.category` and `error.code` must be populated from shared taxonomy.
-
-**Rationale**
-Converts subjective wording into contract-testable acceptance conditions.
-
-## 5) Implementation Handoff
+## 5. Implementation Handoff
 
 ### Scope Classification
-**Moderate**: backlog/story reorganization and explicit planning artifact edits are required before broad implementation.
+**Minor** change scope.
 
-### Handoff Recipients and Responsibilities
-- **Product Owner / Scrum Master**
-  - Update `epics.md` with approved story additions/resequencing, dependency notes, and AC refinements.
-  - Reflect updated story order and dependencies in sprint planning.
-- **Development Team**
-  - Implement Story 1.2 quality gates before expanding feature stories.
-  - Maintain contract schema consistency in subsequent implementation.
-- **QA**
-  - Validate CI gates execute and fail correctly on lint/test/contract violations.
-  - Confirm AC measurability via contract-level checks.
+### Route
+- **Development team / implementation agent** for direct execution.
 
-### Success Criteria for Implementation
-- Epic 1 contains explicit CI quality-gate story and updated numbering.
-- Every epic has explicit `Depends on` notes.
-- Updated stories include schema-level measurable acceptance criteria.
-- CI pipeline validates lint/tests/contract envelope checks before merge.
+### Deliverables
+- Migrate backend dependency management to `uv`.
+- Update relevant docs and compose command.
+- Preserve existing backend behavior and tests.
 
-## Approval and Handoff Log
+### Success Criteria
+- Backend installs/syncs via `uv` from repo without manual pip workflow.
+- `backend/uv.lock` committed.
+- README and compose reflect `uv` commands.
+- Existing backend smoke tests continue to pass.
 
-- 2026-03-01: User approval received for implementation (`yes`).
-- Scope classification confirmed: `Moderate`.
-- Routed to: Product Owner / Scrum Master for backlog reorganization and artifact updates; Development Team for implementation execution; QA for quality-gate verification.
+## Checklist Status Snapshot
+
+### Section 1: Understand Trigger and Context
+- 1.1 Trigger story identified: `[x] Done`
+- 1.2 Core problem defined: `[x] Done`
+- 1.3 Evidence gathered: `[x] Done`
+
+### Section 2: Epic Impact Assessment
+- 2.1 Current epic evaluated: `[x] Done`
+- 2.2 Epic-level changes determined: `[x] Done`
+- 2.3 Remaining epics reviewed: `[x] Done`
+- 2.4 Future epic invalidation/new epic check: `[x] Done`
+- 2.5 Priority/order review: `[x] Done`
+
+### Section 3: Artifact Conflict and Impact
+- 3.1 PRD conflict: `[N/A]`
+- 3.2 Architecture conflict: `[x] Done`
+- 3.3 UX conflict: `[N/A]`
+- 3.4 Other artifacts impact: `[x] Done`
+
+### Section 4: Path Forward Evaluation
+- 4.1 Direct Adjustment: `[x] Viable`
+- 4.2 Potential Rollback: `[x] Not viable`
+- 4.3 PRD MVP Review: `[x] Not viable`
+- 4.4 Recommended path selected: `[x] Done`
+
+### Section 5: Sprint Change Proposal Components
+- 5.1 Issue summary: `[x] Done`
+- 5.2 Impact and adjustments documented: `[x] Done`
+- 5.3 Recommended path with rationale: `[x] Done`
+- 5.4 MVP impact and action plan: `[x] Done`
+- 5.5 Handoff plan: `[x] Done`
+
+## Approval and Handoff Record
+
+- User approval status: **Approved** (`yes`)
+- Approval date: 2026-03-01
+- Scope classification: **Minor**
+- Route: **Development team / implementation agent**
+- Handoff deliverables confirmed:
+  - Apply backend `uv` migration changes
+  - Preserve API behavior and test outcomes
+  - Keep docs and compose commands aligned with `uv`
+
+### Workflow Execution Log
+
+- Correct-course workflow completed through final approval.
+- Handoff recorded to Minor-scope implementation path.
+- No epic/story renumbering required; sprint-status structural updates not required.
