@@ -54,3 +54,13 @@ pytest
 cd frontend
 npm test
 ```
+
+## CI Quality Gates
+
+CI runs on pull requests and pushes to `main` with three required checks:
+
+- `backend-checks` (Ruff + backend pytest suite)
+- `frontend-checks` (ESLint + frontend Vitest suite)
+- `contract-checks` (`/v1/process` response envelope contract tests)
+
+Use these exact job names in branch protection rules so merges are blocked when any quality gate fails.
