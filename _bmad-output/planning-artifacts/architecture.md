@@ -470,7 +470,7 @@ test-bmad/
 - Frontend features -> TanStack Query hooks -> shared API client.
 
 **External Integrations:**
-- OCR provider via `ocr_provider.py`.
+- OCR provider via `ocr_provider.py`; OCR transformation stages should be modeled as an explicit LangChain graph for learning transparency and node-level diagnostics, with OCR invoked as a graph tool node and an LLM node call to `gpt-5-mini` in the same graph path.
 - Pinyin conversion provider via `pinyin_provider.py`.
 - Optional telemetry sink via `telemetry_provider.py`.
 - Future AWS resources via `infra/terraform/*`.

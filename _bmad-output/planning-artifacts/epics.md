@@ -262,6 +262,32 @@ So that I can continue reading immediately.
 **Then** completion state is clearly indicated
 **And** response shape remains versioned under /v1 with no auth required for MVP.
 
+### Story 1.6: Refactor OCR Provider to LangChain Graph-Orchestrated Flow
+
+As Clint,
+I want OCR to run as a tool inside an explicit LangChain graph that also invokes an LLM,
+So that the orchestration is easier to inspect, explain, and extend as a learning artifact.
+
+**Acceptance Criteria:**
+
+**Given** the OCR provider currently transforms Textract output using runnable composition
+**When** the OCR adapter is refactored
+**Then** OCR execution is exposed as a graph tool node
+**And** the graph calls an LLM node using `gpt-5-mini`
+**And** OCR transformation executes through explicit LangChain graph nodes and edges
+**And** node responsibilities are documented in the implementation story.
+
+**Given** OCR graph refactoring is complete
+**When** `/v1/process` is exercised
+**Then** response envelope and payload contract remain unchanged
+**And** existing OCR and pinyin tests continue to pass.
+
+**Given** graph-based orchestration is introduced
+**When** automated tests run
+**Then** tests validate the graph execution path
+**And** tests verify the OCR tool node and `gpt-5-mini` LLM node are both invoked in the expected order
+**And** failure handling still maps to typed OCR error categories.
+
 ## Epic 2: Reliable OCR-to-Pinyin Quality & Recovery
 
 Improve output trust by handling mixed content, uncertainty, partial results, and clear retry/recovery guidance.

@@ -6,7 +6,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/v1': {
-        target: 'http://localhost:8000',
+        // In Docker, the backend is reachable via its service name.
+        // Falls back to localhost for non-Docker local development.
+        target: process.env.BACKEND_URL || 'http://localhost:8000',
         changeOrigin: true
       }
     }

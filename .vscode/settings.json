@@ -2,6 +2,7 @@
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "chat.tools.terminal.autoApprove": {
         ".venv_local/bin/python": true,
-        "uv": true
+        "uv": true,
+        "docker run": true
     }
 }

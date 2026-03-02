@@ -24,5 +24,7 @@ services:
     depends_on:
       - backend
     environment:
-      # Points the frontend Vite dev server at the backend container (not localhost)
-      VITE_API_BASE_URL: http://backend:8000
+      # Tells the Vite proxy (server-side) where to forward /v1/* requests.
+      # The browser only ever talks to the Vite dev server via relative URLs —
+      # it never needs to resolve the Docker-internal "backend" hostname.
+      BACKEND_URL: http://backend:8000

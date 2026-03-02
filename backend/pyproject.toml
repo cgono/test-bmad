@@ -7,6 +7,8 @@ dependencies = [
   "boto3==1.37.26",
   "fastapi==0.129.0",
   "langchain-core==0.3.61",
+  "langgraph==0.3.34",
+  "openai>=1.0.0,<2.0.0",
   "pillow==11.2.1",
   "pydantic==2.11.9",
   "pypinyin==0.55.0",
