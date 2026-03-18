@@ -1,9 +1,15 @@
+import logging
 import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_v1_router
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
+)
 
 app = FastAPI(title="OCR Pinyin API", version="0.1.0")
 

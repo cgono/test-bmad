@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 
 from app.adapters.ocr_provider import (
@@ -10,6 +11,8 @@ from app.adapters.ocr_provider import (
 from app.schemas.process import OcrSegment
 
 OCR_ERROR_CATEGORY = "ocr"
+
+logger = logging.getLogger(__name__)
 
 
 class OcrServiceError(Exception):
@@ -32,11 +35,13 @@ async def extract_chinese_segments(image_bytes: bytes, content_type: str) -> lis
             lambda: provider.extract(image_bytes=image_bytes, content_type=content_type),
         )
     except ProviderUnavailableError as exc:
+        logger.exception("OCR provider unavailable: %s", exc)
         raise OcrServiceError(
             code="ocr_provider_unavailable",
             message="Text extraction is temporarily unavailable. Please try again.",
         ) from exc
     except OcrExecutionError as exc:
+        logger.exception("OCR execution error: %s", exc)
         raise OcrServiceError(
             code="ocr_execution_failed",
             message="Text extraction encountered an error. Please try again.",
