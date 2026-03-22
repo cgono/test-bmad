@@ -1,65 +1,52 @@
-# test-bmad
+# OCR Pinyin
 
-Baseline monorepo for Story 1.1 using FastAPI backend and Vite + React frontend.
+A mobile-first web app for reading Chinese books. Upload a photo of a page, get Hanyu Pinyin back — aligned to the source text — so you can keep reading without interruption.
 
-## Prerequisites
+Built for iPhone Safari. No account required.
 
-- Python 3.12+
-- uv
-- Node.js 24+
-- npm 11+
+## How it works
 
-## Local Startup (without Docker)
+1. Capture or upload a photo of a Chinese book page
+2. The backend validates the image and runs OCR via Google Cloud Vision
+3. Chinese text is extracted and converted to Hanyu Pinyin (tone marks)
+4. The result view shows the uploaded image alongside the pinyin output
 
-### Backend
+## Stack
 
-```bash
-cd backend
-uv sync --project . --dev
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+- **Backend:** Python / FastAPI, Google Cloud Vision (OCR), `pypinyin`
+- **Frontend:** React / Vite, TanStack Query
+- **API:** Versioned REST under `/v1`, structured JSON envelope (`success | partial | error`)
+- **Infra:** Docker Compose for local parity
 
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs at `http://localhost:5173` and posts to `POST /v1/process`.
-
-## Docker Compose Startup
+## Quick start
 
 ```bash
 docker compose up --build
 ```
 
-- Backend: `http://localhost:8000`
 - Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
 
-## Tests
+See [CONTRIBUTING.md](CONTRIBUTING.md) for manual setup and developer tooling.
 
-### Backend smoke tests
+## API
 
-```bash
-cd backend
-uv run pytest
+`POST /v1/process` — upload an image, receive pinyin
+
+```
+GET  /openapi.json   — OpenAPI 3.x spec (auto-updated)
+GET  /docs           — Swagger UI
 ```
 
-### Frontend smoke tests
+A Bruno developer collection is available in `docs/bruno/` for interactive testing.
 
-```bash
-cd frontend
-npm test
-```
+## Project status
 
-## CI Quality Gates
-
-CI runs on pull requests and pushes to `main` with three required checks:
-
-- `backend-checks` (Ruff + backend pytest suite)
-- `frontend-checks` (ESLint + frontend Vitest suite)
-- `contract-checks` (`/v1/process` response envelope contract tests)
-
-Use these exact job names in branch protection rules so merges are blocked when any quality gate fails.
+| Epic | Focus | Status |
+|------|-------|--------|
+| 1 | Foundation — capture to pinyin vertical slice | Done |
+| 2 | OCR quality, mixed-language handling, partial results | In progress |
+| 3 | Diagnostics, observability, health/metrics endpoints | Backlog |
+| 4 | Cost guardrails and safe usage controls | Backlog |
+| 5 | History, reuse, and future evolution | Backlog |
