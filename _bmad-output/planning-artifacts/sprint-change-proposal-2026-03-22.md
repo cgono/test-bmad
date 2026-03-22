@@ -40,7 +40,7 @@ Discovered during integration testing after Epic 1 completion. The 2026-03-18 sp
 | `textract_ocr_provider.py` | ✅ Kept as legacy | File retained; Textract path still accessible via `OCR_PROVIDER=textract` |
 | `pyproject.toml` | ⚠️ Action needed | Remove `boto3`/`botocore`; add `google-cloud-vision>=3.7` |
 | `backend/.env.example` | ⚠️ Action needed | Replace AWS vars with GCV credential vars |
-| `docker-compose.yml` | ⚠️ Action needed | Add credentials file volume mount |
+| `docker-compose.yml` | ⚠️ Action needed | Remove credentials file volume mount; rely on embedded JSON env var |
 | `epics.md` | ⚠️ Action needed | Add Story 1.7 |
 | `sprint-status.yaml` | ⚠️ Action needed | Add Story 1.7 entry under Epic 1 |
 
@@ -164,17 +164,17 @@ AWS_SECRET_ACCESS_KEY=your-secret-access-key
 
 NEW:
 OCR_PROVIDER=google_vision
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
-# Optional — only needed if not encoded in the credentials file:
+GOOGLE_APPLICATION_CREDENTIALS_JSON='{"type":"service_account","project_id":"your-project-id","private_key_id":"private_key_id","private_key":"private_key","client_email":"service-account@your-project-id.iam.gserviceaccount.com","client_id":"client_id","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/service-account%40your-project-id.iam.gserviceaccount.com","universe_domain":"googleapis.com"}'
+# Optional — only needed if not encoded in the embedded credentials JSON:
 # GOOGLE_CLOUD_PROJECT=your-project-id
 ```
 
 ```yaml
 docker-compose.yml backend service
 
-ADD under the backend service:
-volumes:
-  - ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro
+NO CHANGE REQUIRED:
+The backend reads `GOOGLE_APPLICATION_CREDENTIALS_JSON` directly from `env_file`,
+so no credentials file volume mount is needed.
 ```
 
 ---
@@ -202,14 +202,14 @@ google-cloud-vision>=3.7
 | `ocr_provider.py` | Dev | Apply Proposal 4.3 |
 | `pyproject.toml` | Dev | Apply Proposal 4.5 |
 | `backend/.env.example` | Dev | Apply Proposal 4.4 |
-| `docker-compose.yml` | Dev | Apply Proposal 4.4 volume mount |
+| `docker-compose.yml` | Dev | Remove obsolete credentials file volume mount; keep env-file-only setup |
 | `epics.md` | SM/Dev | Add Story 1.7 per Proposal 4.1 |
 | `architecture.md` | SM/Dev | Apply Proposal 4.2 |
 | `sprint-status.yaml` | SM/Dev | Add `1-7-swap-ocr-provider-to-google-cloud-vision: ready-for-dev` under Epic 1 |
 
 **Success criteria:**
 - `POST /v1/process` with a real Chinese book page photo returns `status: success` and populated `data.ocr.segments[]` containing Chinese characters
-- `OCR_PROVIDER=google_vision` configured in `backend/.env` and credentials file mounted
+- `OCR_PROVIDER=google_vision` configured in `backend/.env` with `GOOGLE_APPLICATION_CREDENTIALS_JSON` set to embedded service-account JSON
 - All existing backend tests pass (`pytest backend/`)
 - `OCR_PROVIDER` unset still falls through to `NoOpOcrProvider`
 

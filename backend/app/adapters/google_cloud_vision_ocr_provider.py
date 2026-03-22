@@ -12,17 +12,20 @@ chain is composed of two RunnableLambda steps:
 
 Environment variables
 ---------------------
-OCR_PROVIDER=google_vision        Activates this provider.
-GOOGLE_APPLICATION_CREDENTIALS    Path to GCP service account JSON key file.
-GOOGLE_CLOUD_PROJECT              Optional; only needed if not in credentials.
+OCR_PROVIDER=google_vision              Activates this provider.
+GOOGLE_APPLICATION_CREDENTIALS_JSON    GCP service account JSON embedded as a string value.
+GOOGLE_CLOUD_PROJECT                   Optional; only needed if not encoded in the credentials.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 
 import google.api_core.exceptions
 from google.cloud import vision
+from google.oauth2 import service_account
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda
 
@@ -90,11 +93,23 @@ class GoogleCloudVisionOcrProvider:
 
     def __init__(self) -> None:
         try:
-            self._client = vision.ImageAnnotatorClient()
+            creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            if creds_json:
+                normalized_creds_json = creds_json.strip()
+                if normalized_creds_json[:1] == normalized_creds_json[-1:] and normalized_creds_json[:1] in {"'", '"'}:
+                    normalized_creds_json = normalized_creds_json[1:-1]
+                info = json.loads(normalized_creds_json)
+                credentials = service_account.Credentials.from_service_account_info(
+                    info,
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                )
+                self._client = vision.ImageAnnotatorClient(credentials=credentials)
+            else:
+                self._client = vision.ImageAnnotatorClient()
         except Exception as exc:
             raise ProviderUnavailableError(
                 "Could not initialise Google Cloud Vision client. "
-                "Check GOOGLE_APPLICATION_CREDENTIALS."
+                "Check GOOGLE_APPLICATION_CREDENTIALS_JSON."
             ) from exc
 
     def extract(self, *, image_bytes: bytes, content_type: str) -> list[RawOcrSegment]:
