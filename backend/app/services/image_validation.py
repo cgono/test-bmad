@@ -65,8 +65,9 @@ def validate_image_upload(file: UploadFile | None) -> ValidatedImage:
 
     try:
         with Image.open(io.BytesIO(image_bytes)) as img:
-            img.load()  # Full decode: validates integrity and catches corrupt/truncated data.
-            width, height = img.size
+            width, height = img.size  # Header-only: no pixel decode yet.
+            if width * height <= MAX_IMAGE_PIXELS:
+                img.load()  # Full decode only within safe bounds; validates integrity.
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
         raise ImageValidationError(
             code="image_decode_failed",

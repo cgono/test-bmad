@@ -130,12 +130,17 @@ class GoogleCloudVisionOcrProvider:
             for block in page.blocks
         )
         logger.debug("GCV returned %d paragraph(s)", paragraphs)
+        first_paragraph = next(
+            (
+                para
+                for page in (response.full_text_annotation.pages or [])
+                for block in page.blocks
+                for para in block.paragraphs
+            ),
+            None,
+        )
         logger.debug(
             "GCV first paragraph: %s",
-            _paragraph_text(
-                response.full_text_annotation.pages[0].blocks[0].paragraphs[0]
-            )[:40]
-            if paragraphs > 0
-            else "(none)",
+            _paragraph_text(first_paragraph)[:40] if first_paragraph else "(none)",
         )
         return _extraction_chain.invoke(response)
