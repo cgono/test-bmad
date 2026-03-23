@@ -21,6 +21,14 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`
 }
 
+function statusPanelClass(mutation) {
+  if (mutation.isPending) return 'status-panel status-panel--loading'
+  if (mutation.error) return 'status-panel status-panel--error'
+  if (mutation.data?.status === 'partial') return 'status-panel status-panel--partial'
+  if (mutation.data) return 'status-panel status-panel--success'
+  return 'status-panel status-panel--idle'
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -63,33 +71,41 @@ export default function UploadForm() {
       />
 
       <form onSubmit={handleSubmit} aria-label="process-upload-form">
-        <button
-          type="button"
-          onClick={() => cameraInputRef.current?.click()}
-        >
-          Take Photo
-        </button>
-        <div style={{ marginTop: '0.75rem' }}>
-          <label htmlFor="upload-image">Upload image</label>
-          <input
-            id="upload-image"
-            name="upload-image"
-            type="file"
-            accept="image/*"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-          />
+        <div className="upload-actions">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            Take Photo
+          </button>
+          <div className="file-input-wrapper">
+            <label className="upload-label" htmlFor="upload-image">Upload image</label>
+            <input
+              id="upload-image"
+              name="upload-image"
+              type="file"
+              accept="image/*"
+              className="file-input"
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+            />
+          </div>
+          <button type="submit" disabled={mutation.isPending} className="btn-secondary">
+            {mutation.isPending ? 'Submitting...' : 'Submit'}
+          </button>
         </div>
-        <button type="submit" disabled={mutation.isPending} style={{ marginTop: '0.75rem' }}>
-          {mutation.isPending ? 'Submitting...' : 'Submit'}
-        </button>
       </form>
 
-      <div style={{ marginTop: '1rem' }}>
-        <h2>Processing Status</h2>
-        {!mutation.data && !mutation.error && !mutation.isPending && <p>Waiting for submission.</p>}
-        {mutation.isPending && <p>Uploading image...</p>}
+      <div className={statusPanelClass(mutation)}>
+        <h2 className="status-panel__title">Processing Status</h2>
+        {!mutation.data && !mutation.error && !mutation.isPending && (
+          <p className="status-panel__message">Waiting for submission.</p>
+        )}
+        {mutation.isPending && (
+          <p className="status-panel__message">Uploading image...</p>
+        )}
         {mutation.error && (
-          <p role="alert">
+          <p role="alert" className="status-panel__alert">
             {recoveryGuidanceByCode[mutation.error.code] || mutation.error.message}
           </p>
         )}
@@ -101,30 +117,35 @@ export default function UploadForm() {
                 ✓ Processing complete
               </p>
             )}
-            <p>Status: {mutation.data.status}</p>
-            <p>Request ID: {mutation.data.request_id}</p>
+            {mutation.data.status === 'partial' && (
+              <p className="status-panel__partial-note" aria-label="processing-partial">
+                Partial result available
+              </p>
+            )}
+            <p className="status-panel__meta">Status: {mutation.data.status}</p>
+            <p className="status-panel__meta">Request ID: {mutation.data.request_id}</p>
 
             {/* Unified result: image + pinyin reading together */}
             {(previewUrl || pinyinSegments.length > 0) && (
-              <div aria-label="result-view" style={{ marginTop: '1rem' }}>
+              <div aria-label="result-view" className="result-view">
                 {previewUrl && (
                   <div>
                     <img
                       src={previewUrl}
                       alt="Uploaded image"
-                      style={{ maxWidth: '100%', maxHeight: 320, display: 'block', marginBottom: '1rem' }}
+                      className="result-image"
                     />
                   </div>
                 )}
 
                 {pinyinSegments.length > 0 && (
                   <div aria-label="pinyin-result">
-                    <h3>Pinyin Reading</h3>
-                    <div style={{ fontSize: '1.4rem', lineHeight: 2.5, wordBreak: 'break-all' }}>
+                    <h3 className="pinyin-result__title">Pinyin Reading</h3>
+                    <div className="pinyin-result__content">
                       {pinyinSegments.map((seg, index) => (
                         <ruby key={`${seg.hanzi}-${index}`}>
                           {seg.hanzi}
-                          <rt style={{ fontSize: '0.55em', color: '#555' }}>{seg.pinyin}</rt>
+                          <rt>{seg.pinyin}</rt>
                         </ruby>
                       ))}
                     </div>
@@ -135,7 +156,7 @@ export default function UploadForm() {
 
             {/* Secondary: raw OCR details */}
             {ocrSegments.length > 0 && (
-              <details style={{ marginTop: '1rem' }}>
+              <details className="details-section">
                 <summary>Extracted Text (OCR details)</summary>
                 <ul>
                   {ocrSegments.map((segment, index) => (
@@ -153,4 +174,3 @@ export default function UploadForm() {
     </section>
   )
 }
-

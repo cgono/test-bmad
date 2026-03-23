@@ -51,7 +51,8 @@ development_status:
   epic-1-retrospective: done
 
   epic-2: in-progress
-  2-1-filter-mixed-language-ocr-for-chinese-to-pinyin-conversion: ready-for-dev
+  2-0-implement-frontend-styling-foundation: done
+  2-1-filter-mixed-language-ocr-for-chinese-to-pinyin-conversion: backlog
   2-2-align-pinyin-output-with-source-text-segments: backlog
   2-3-return-partial-results-with-explicit-failure-categories: backlog
   2-4-add-low-confidence-guidance-and-in-flow-retry: backlog

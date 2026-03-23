@@ -22,6 +22,20 @@ const DEFAULT_SUCCESS_RESPONSE = {
   }
 }
 
+const DEFAULT_PARTIAL_RESPONSE = {
+  status: 'partial',
+  request_id: 'req_partial',
+  data: {
+    ocr: {
+      segments: [{ text: '你好', language: 'zh', confidence: 0.72 }]
+    },
+    pinyin: {
+      segments: [{ hanzi: '你', pinyin: 'nǐ' }]
+    },
+    job_id: null
+  }
+}
+
 vi.mock('../../../lib/api-client', () => ({
   submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE)
 }))
@@ -227,3 +241,107 @@ describe('UploadForm', () => {
   })
 })
 
+describe('UploadForm styling and accessibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders upload actions and status panel with semantic class structure', () => {
+    renderWithClient(<UploadForm />)
+    expect(document.querySelector('.upload-actions')).toBeInTheDocument()
+    expect(document.querySelector('.status-panel')).toBeInTheDocument()
+    expect(document.querySelector('.status-panel--idle')).toBeInTheDocument()
+  })
+
+  it('applies loading state class while processing', async () => {
+    let release
+    submitProcessRequest.mockImplementationOnce(
+      () => new Promise((resolve) => { release = resolve })
+    )
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await screen.findByText(/uploading image/i)
+    expect(document.querySelector('.status-panel--loading')).toBeInTheDocument()
+    release(DEFAULT_SUCCESS_RESPONSE)
+  })
+
+  it('applies success state class after processing completes', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await screen.findByLabelText(/processing-complete/i)
+    expect(document.querySelector('.status-panel--success')).toBeInTheDocument()
+  })
+
+  it('applies partial state class when processing returns a partial result', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DEFAULT_PARTIAL_RESPONSE)
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await screen.findByLabelText(/processing-partial/i)
+    expect(document.querySelector('.status-panel--partial')).toBeInTheDocument()
+    expect(screen.getByText(/status:\s*partial/i)).toBeInTheDocument()
+  })
+
+  it('applies error state class when processing fails', async () => {
+    submitProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('bad image'), { code: 'image_decode_failed' })
+    )
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'bad.png', { type: 'image/png' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await screen.findByRole('alert')
+    expect(document.querySelector('.status-panel--error')).toBeInTheDocument()
+  })
+
+  it('uses semantic class on pinyin result content for typography styling', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await screen.findByLabelText(/pinyin-result/i)
+    expect(document.querySelector('.pinyin-result__content')).toBeInTheDocument()
+  })
+
+  it('renders OCR details in a collapsed details element with semantic class', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    await screen.findByLabelText(/result-view/i)
+    const detailsEl = document.querySelector('details')
+    expect(detailsEl).toBeInTheDocument()
+    expect(detailsEl).not.toHaveAttribute('open')
+    expect(detailsEl).toHaveClass('details-section')
+  })
+
+  it('key content is accessible in the document after successful processing', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/result-view/i)
+    // Primary actions remain accessible
+    expect(screen.getByRole('button', { name: /take photo/i })).toBeInTheDocument()
+    // Pinyin content is accessible
+    expect(screen.getByLabelText(/pinyin-result/i)).toBeInTheDocument()
+    // Details toggle is accessible
+    expect(screen.getByText(/extracted text/i)).toBeInTheDocument()
+  })
+})
