@@ -166,6 +166,30 @@ def test_process_endpoint_pinyin_error_envelope_contract() -> None:
     assert payload["warnings"][0]["code"] == "pinyin_provider_unavailable"
 
 
+def test_process_endpoint_low_confidence_envelope_contract() -> None:
+    """Low-confidence OCR with working pinyin returns a valid partial envelope."""
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider([RawOcrSegment(text="你好", language="zh", confidence=0.45)]),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        response = asyncio.run(process_image(_request_with_body(PNG_1X1_BYTES, "image/png")))
+    payload = response.model_dump(exclude_none=True)
+    assert_process_envelope(payload)
+    assert payload["status"] == "partial"
+    assert payload["warnings"][0]["category"] == "ocr"
+    assert payload["warnings"][0]["code"] == "ocr_low_confidence"
+    # Both ocr and pinyin present in the partial payload
+    assert "ocr" in payload["data"]
+    assert "pinyin" in payload["data"]
+
+
 def test_process_success_ocr_fields_unchanged_after_pinyin_addition() -> None:
     """Existing OCR contract fields (segments, language, confidence) must not drift."""
     pinyin_segments = [RawPinyinSegment(hanzi="你", pinyin="nǐ")]

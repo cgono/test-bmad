@@ -15,6 +15,7 @@ const recoveryGuidanceByCode = {
   ocr_provider_unavailable: 'Text extraction is temporarily unavailable. Tap Take Photo to retry.',
   pinyin_provider_unavailable: 'Pinyin generation is temporarily unavailable. Tap Submit to retry.',
   pinyin_execution_failed: 'Pinyin generation encountered an error. Tap Submit to retry.',
+  ocr_low_confidence: 'OCR confidence is low. Tap Retake Photo for a clearer result.',
 }
 
 function formatConfidence(confidence) {
@@ -41,6 +42,7 @@ export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const cameraInputRef = useRef(null)
+  const [dismissedLowConfidence, setDismissedLowConfidence] = useState(false)
 
   // Create and revoke object URL when file changes
   useEffect(() => {
@@ -54,16 +56,27 @@ export default function UploadForm() {
   }, [file])
 
   const mutation = useMutation({
-    mutationFn: () => submitProcessRequest(file),
+    mutationFn: (nextFile = file) => submitProcessRequest(nextFile),
   })
+
+  const handleFileChange = (event) => {
+    const nextFile = event.target.files?.[0] || null
+    setFile(nextFile)
+    setDismissedLowConfidence(false)
+    if (nextFile && mutation.data?.warnings?.some(w => w.code === 'ocr_low_confidence')) {
+      mutation.mutate(nextFile)
+    }
+  }
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    setDismissedLowConfidence(false)
     mutation.mutate()
   }
 
   const pinyinSegments = mutation.data?.data?.pinyin?.segments || []
   const ocrSegments = mutation.data?.data?.ocr?.segments || []
+  const isLowConfidence = mutation.data?.warnings?.some(w => w.code === 'ocr_low_confidence') ?? false
 
   return (
     <section>
@@ -75,7 +88,7 @@ export default function UploadForm() {
         capture="environment"
         style={{ display: 'none' }}
         aria-hidden="true"
-        onChange={(event) => setFile(event.target.files?.[0] || null)}
+        onChange={handleFileChange}
       />
 
       <form onSubmit={handleSubmit} aria-label="process-upload-form">
@@ -95,7 +108,7 @@ export default function UploadForm() {
               type="file"
               accept="image/*"
               className="file-input"
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
+              onChange={handleFileChange}
             />
           </div>
           <button type="submit" disabled={mutation.isPending} className="btn-secondary">
@@ -132,15 +145,38 @@ export default function UploadForm() {
             )}
             {mutation.data.status === 'partial' && mutation.data.warnings?.length > 0 && (
               <div aria-label="processing-warnings">
-                {mutation.data.warnings.map((w, i) => (
-                  <p
-                    key={`${w.code}-${i}`}
-                    className="status-panel__warning"
-                    role="status"
-                  >
-                    {recoveryGuidanceByCode[w.code] || w.message}
-                  </p>
-                ))}
+                {mutation.data.warnings
+                  .filter(w => w.code !== 'ocr_low_confidence')
+                  .map((w, i) => (
+                    <p
+                      key={`${w.code}-${i}`}
+                      className="status-panel__warning"
+                      role="status"
+                    >
+                      {recoveryGuidanceByCode[w.code] || w.message}
+                    </p>
+                  ))}
+              </div>
+            )}
+            {isLowConfidence && !dismissedLowConfidence && (
+              <div className="confidence-guidance" aria-label="low-confidence-guidance">
+                <p className="status-panel__warning">
+                  {recoveryGuidanceByCode['ocr_low_confidence']}
+                </p>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  Retake Photo
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setDismissedLowConfidence(true)}
+                >
+                  Use This Result Anyway
+                </button>
               </div>
             )}
             <p className="status-panel__meta">Status: {mutation.data.status}</p>

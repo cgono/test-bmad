@@ -10,7 +10,7 @@ from app.services.image_validation import (
     ImageValidationError,
     validate_image_upload,
 )
-from app.services.ocr_service import OcrServiceError, extract_chinese_segments
+from app.services.ocr_service import OcrServiceError, extract_chinese_segments, is_low_confidence
 from app.services.pinyin_service import PinyinServiceError, generate_pinyin
 
 router = APIRouter()
@@ -79,6 +79,26 @@ async def _build_process_response(
                     category=error.category,
                     code=error.code,
                     message=error.message,
+                )
+            ],
+        )
+
+    if is_low_confidence(segments):
+        return ProcessResponse(
+            status="partial",
+            request_id=request_id,
+            data=ProcessData(
+                ocr=OcrData(segments=segments),
+                pinyin=pinyin_data,
+                job_id=None,
+            ),
+            warnings=[
+                ProcessWarning(
+                    category="ocr",
+                    code="ocr_low_confidence",
+                    message=(
+                        "OCR confidence is low. Consider retaking the photo for better results."
+                    ),
                 )
             ],
         )

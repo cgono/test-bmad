@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 
 from app.adapters.ocr_provider import (
@@ -13,6 +14,29 @@ from app.schemas.process import OcrSegment
 OCR_ERROR_CATEGORY = "ocr"
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_low_confidence_threshold() -> float:
+    raw_value = os.getenv("OCR_LOW_CONFIDENCE_THRESHOLD", "0.7")
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid OCR_LOW_CONFIDENCE_THRESHOLD %r; falling back to default 0.7",
+            raw_value,
+        )
+        return 0.7
+
+
+LOW_CONFIDENCE_THRESHOLD: float = _resolve_low_confidence_threshold()
+
+
+def is_low_confidence(segments: list[OcrSegment]) -> bool:
+    """Return True if average OCR confidence is below LOW_CONFIDENCE_THRESHOLD."""
+    if not segments:
+        return False
+    avg_confidence = sum(s.confidence for s in segments) / len(segments)
+    return avg_confidence < LOW_CONFIDENCE_THRESHOLD
 
 
 class OcrServiceError(Exception):

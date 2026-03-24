@@ -189,6 +189,57 @@ def test_process_route_enforces_size_limit_without_content_length_header() -> No
     assert response.error.code == "file_too_large"
 
 
+def test_process_route_low_confidence_ocr_returns_partial_with_guidance() -> None:
+    """Low-confidence OCR segments with successful pinyin returns partial with guidance warning."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.45)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([
+            RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+            RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+        ]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.error is None
+    assert response.warnings is not None
+    assert len(response.warnings) == 1
+    assert response.warnings[0].category == "ocr"
+    assert response.warnings[0].code == "ocr_low_confidence"
+
+
+def test_process_route_low_confidence_includes_both_ocr_and_pinyin_data() -> None:
+    """Low-confidence partial response preserves both OCR and pinyin."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.45)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([
+            RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+            RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+        ]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert response.data.ocr.segments[0].text == "你好"
+    # pinyin IS present in low-confidence partial (unlike story 2-3 pinyin-failure partial)
+    assert response.data.pinyin is not None
+    assert len(response.data.pinyin.segments) == 1
+    assert response.data.pinyin.segments[0].source_text == "你好"
+
+
 def test_process_route_mixed_segments_returns_aligned_and_uncertain() -> None:
     """Multiple OCR segments where one fails alignment → status=success with mixed segments."""
     call_count = 0

@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-24"  # updated: story 2-3 done
+last_updated: "2026-03-25"  # updated: story 2-4 review
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -56,7 +56,7 @@ development_status:
   2-1-filter-mixed-language-ocr-for-chinese-to-pinyin-conversion: done
   2-2-align-pinyin-output-with-source-text-segments: done
   2-3-return-partial-results-with-explicit-failure-categories: done
-  2-4-add-low-confidence-guidance-and-in-flow-retry: backlog
+  2-4-add-low-confidence-guidance-and-in-flow-retry: done
   epic-2-retrospective: optional
 
   epic-3: backlog

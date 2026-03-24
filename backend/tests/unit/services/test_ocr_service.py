@@ -166,3 +166,18 @@ def test_normalize_language_handles_none_and_empty() -> None:
     assert _normalize_language("") == "und"
     assert _normalize_language("  ") == "und"
     assert _normalize_language("ZH-HANS") == "zh-hans"
+
+
+def test_invalid_low_confidence_threshold_falls_back_to_default(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from app.services.ocr_service import _resolve_low_confidence_threshold
+
+    monkeypatch.setenv("OCR_LOW_CONFIDENCE_THRESHOLD", "not-a-number")
+
+    with caplog.at_level("WARNING"):
+        threshold = _resolve_low_confidence_threshold()
+
+    assert threshold == pytest.approx(0.7)
+    assert "Invalid OCR_LOW_CONFIDENCE_THRESHOLD" in caplog.text

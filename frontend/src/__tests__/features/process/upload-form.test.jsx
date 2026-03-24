@@ -42,6 +42,32 @@ const DEFAULT_PARTIAL_RESPONSE = {
   ]
 }
 
+const LOW_CONFIDENCE_PARTIAL_RESPONSE = {
+  status: 'partial',
+  request_id: 'req_low_conf',
+  data: {
+    ocr: {
+      segments: [{ text: '你好', language: 'zh', confidence: 0.45 }]
+    },
+    pinyin: {
+      segments: [
+        {
+          source_text: '你好',
+          pinyin_text: 'nǐ hǎo',
+          alignment_status: 'aligned'
+        }
+      ]
+    }
+  },
+  warnings: [
+    {
+      category: 'ocr',
+      code: 'ocr_low_confidence',
+      message: 'OCR confidence is low. Consider retaking the photo for better results.'
+    }
+  ]
+}
+
 vi.mock('../../../lib/api-client', () => ({
   submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE)
 }))
@@ -277,6 +303,69 @@ describe('UploadForm', () => {
     await waitFor(() => {
       expect(screen.getByText(/status:\s*success/i)).toBeInTheDocument()
     })
+  })
+
+  it('shows low-confidence guidance with retake and proceed options when confidence is low', async () => {
+    submitProcessRequest.mockResolvedValueOnce(LOW_CONFIDENCE_PARTIAL_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByLabelText(/low-confidence-guidance/i)).toBeInTheDocument()
+    expect(screen.getByText(/ocr confidence is low/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /retake photo/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /use this result anyway/i })).toBeInTheDocument()
+  })
+
+  it('hides low-confidence guidance and shows result when use this result anyway is clicked', async () => {
+    submitProcessRequest.mockResolvedValueOnce(LOW_CONFIDENCE_PARTIAL_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/low-confidence-guidance/i)
+    await user.click(screen.getByRole('button', { name: /use this result anyway/i }))
+
+    expect(screen.queryByLabelText(/low-confidence-guidance/i)).not.toBeInTheDocument()
+    // Pinyin result is still visible after dismissal
+    expect(screen.getByLabelText(/pinyin-result/i)).toBeInTheDocument()
+  })
+
+  it('retries automatically in-flow when a new file is selected after low confidence', async () => {
+    submitProcessRequest
+      .mockResolvedValueOnce(LOW_CONFIDENCE_PARTIAL_RESPONSE)
+      .mockResolvedValueOnce(DEFAULT_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+    const uploadInput = screen.getByLabelText(/upload image/i)
+
+    const firstFile = new globalThis.File(['img-bytes'], 'first.jpg', { type: 'image/jpeg' })
+    await user.upload(uploadInput, firstFile)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByLabelText(/low-confidence-guidance/i)).toBeInTheDocument()
+    expect(submitProcessRequest).toHaveBeenCalledTimes(1)
+
+    const retryFile = new globalThis.File(['retry-bytes'], 'retry.jpg', { type: 'image/jpeg' })
+    await user.upload(uploadInput, retryFile)
+
+    await waitFor(() => {
+      expect(submitProcessRequest).toHaveBeenCalledTimes(2)
+    })
+    expect(submitProcessRequest).toHaveBeenLastCalledWith(retryFile)
+    expect(await screen.findByLabelText(/processing-complete/i)).toBeInTheDocument()
   })
 
   it('shows fallback error message for unrecognised validation code', async () => {
