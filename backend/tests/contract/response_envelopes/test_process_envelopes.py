@@ -83,8 +83,14 @@ def test_process_endpoint_success_envelope_contract() -> None:
     assert_process_envelope(payload)
     # Verify pinyin is present in the success payload
     assert "pinyin" in payload["data"]
-    assert payload["data"]["pinyin"]["segments"][0]["hanzi"] == "你"
-    assert payload["data"]["pinyin"]["segments"][1]["hanzi"] == "好"
+    # The stub returns two RawPinyinSegments for one OCR segment "你好"
+    # generate_pinyin() produces ONE PinyinSegment per OCR segment
+    assert len(payload["data"]["pinyin"]["segments"]) == 1
+    seg = payload["data"]["pinyin"]["segments"][0]
+    assert seg["source_text"] == "你好"
+    assert seg["pinyin_text"] == "nǐ hǎo"
+    assert seg["alignment_status"] == "aligned"
+    assert "reason_code" not in seg  # excluded because None + exclude_none=True
 
 
 def test_process_endpoint_partial_envelope_contract() -> None:

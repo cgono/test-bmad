@@ -14,8 +14,10 @@ class OcrData(BaseModel):
 
 
 class PinyinSegment(BaseModel):
-    hanzi: str
-    pinyin: str
+    source_text: str
+    pinyin_text: str
+    alignment_status: Literal["aligned", "uncertain"]
+    reason_code: str | None = None
 
 
 class PinyinData(BaseModel):

@@ -14,8 +14,11 @@ const DEFAULT_SUCCESS_RESPONSE = {
     },
     pinyin: {
       segments: [
-        { hanzi: '你', pinyin: 'nǐ' },
-        { hanzi: '好', pinyin: 'hǎo' },
+        {
+          source_text: '你好',
+          pinyin_text: 'nǐ hǎo',
+          alignment_status: 'aligned'
+        },
       ]
     },
     job_id: null
@@ -30,7 +33,13 @@ const DEFAULT_PARTIAL_RESPONSE = {
       segments: [{ text: '你好', language: 'zh', confidence: 0.72 }]
     },
     pinyin: {
-      segments: [{ hanzi: '你', pinyin: 'nǐ' }]
+      segments: [
+        {
+          source_text: '你好',
+          pinyin_text: 'nǐ hǎo',
+          alignment_status: 'aligned'
+        },
+      ]
     },
     job_id: null
   }
@@ -105,14 +114,46 @@ describe('UploadForm', () => {
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(within(form).getByRole('button', { name: /submit/i }))
 
-    expect(await screen.findByLabelText(/pinyin-result/i)).toBeInTheDocument()
+    const pinyinResult = await screen.findByLabelText(/pinyin-result/i)
+    expect(pinyinResult).toBeInTheDocument()
     expect(screen.getByText('Pinyin Reading')).toBeInTheDocument()
-    // Characters are rendered as ruby elements
-    expect(screen.getByText('你')).toBeInTheDocument()
-    expect(screen.getByText('好')).toBeInTheDocument()
-    // Pinyin readings are rendered as rt elements
-    expect(screen.getByText('nǐ')).toBeInTheDocument()
-    expect(screen.getByText('hǎo')).toBeInTheDocument()
+    expect(within(pinyinResult).getByText('你好')).toBeInTheDocument()
+    expect(within(pinyinResult).getByText('nǐ hǎo')).toBeInTheDocument()
+  })
+
+  it('shows uncertain segments explicitly when alignment fails for one segment', async () => {
+    submitProcessRequest.mockResolvedValueOnce({
+      ...DEFAULT_SUCCESS_RESPONSE,
+      data: {
+        ...DEFAULT_SUCCESS_RESPONSE.data,
+        pinyin: {
+          segments: [
+            {
+              source_text: '你好',
+              pinyin_text: 'nǐ hǎo',
+              alignment_status: 'aligned'
+            },
+            {
+              source_text: '世界',
+              pinyin_text: '',
+              alignment_status: 'uncertain',
+              reason_code: 'pinyin_execution_failed'
+            },
+          ]
+        }
+      }
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByText('世界')).toBeInTheDocument()
+    expect(screen.getByText('Uncertain pronunciation')).toBeInTheDocument()
   })
 
   it('shows explicit completion state when processing succeeds', async () => {
@@ -158,7 +199,9 @@ describe('UploadForm', () => {
     await screen.findByLabelText(/result-view/i)
     // OCR details available in a disclosure widget (secondary)
     expect(screen.getByText(/extracted text/i)).toBeInTheDocument()
-    expect(screen.getByText(/你好/)).toBeInTheDocument()
+    const detailsEl = document.querySelector('details')
+    expect(detailsEl).not.toBeNull()
+    expect(within(detailsEl).getByText(/你好/)).toBeInTheDocument()
     expect(screen.getByText(/zh, 98%/i)).toBeInTheDocument()
   })
 

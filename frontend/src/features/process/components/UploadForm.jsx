@@ -29,6 +29,14 @@ function statusPanelClass(mutation) {
   return 'status-panel status-panel--idle'
 }
 
+function renderPinyinAnnotation(segment) {
+  if (segment.alignment_status === 'uncertain') {
+    return segment.reason_code === 'pinyin_execution_failed' ? 'Uncertain pronunciation' : 'Uncertain'
+  }
+
+  return segment.pinyin_text
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -143,9 +151,9 @@ export default function UploadForm() {
                     <h3 className="pinyin-result__title">Pinyin Reading</h3>
                     <div className="pinyin-result__content">
                       {pinyinSegments.map((seg, index) => (
-                        <ruby key={`${seg.hanzi}-${index}`}>
-                          {seg.hanzi}
-                          <rt>{seg.pinyin}</rt>
+                        <ruby key={`${seg.source_text}-${seg.alignment_status}-${index}`}>
+                          {seg.source_text}
+                          <rt>{renderPinyinAnnotation(seg)}</rt>
                         </ruby>
                       ))}
                     </div>
