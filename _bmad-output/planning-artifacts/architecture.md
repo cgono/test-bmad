@@ -27,7 +27,7 @@ Operationally, the requirements include service health/metrics endpoints, diagno
 **Non-Functional Requirements:**
 Architecture is strongly shaped by correctness-first output quality for reading/pronunciation use, with latency as a secondary but explicit constraint (target under 2 seconds for typical inputs). Reliability expectations require structured outcomes for every request and graceful degradation on uncertain OCR or provider/tool failures. Security and privacy expectations include TLS transport, private artifact handling, and externalized secret management.
 
-Cost governance is an explicit non-functional driver: per-request cost estimation, daily aggregation, and budget threshold enforcement/warning around ~1 SGD/day. Observability is also foundational: telemetry emission and diagnostic detail should support rapid self-debug and optional Datadog integration.
+Cost governance is an explicit non-functional driver: per-request cost estimation, daily aggregation, and budget threshold enforcement/warning around ~1 SGD/day. Observability is also foundational: telemetry emission and diagnostic detail should support rapid self-debug, Sentry-based error tracking, and lightweight metrics dashboarding.
 
 **Scale & Complexity:**
 The project is product-scope small but architecturally non-trivial due to orchestration and cross-cutting concerns. The backend must coordinate upload processing, OCR/pinyin transformation, diagnostics capture, history persistence, and cost/accounting logic while maintaining a simple user-facing flow.
@@ -59,13 +59,13 @@ Full-stack (API backend + lightweight web frontend) based on project requirement
 - Cons: includes PostgreSQL, auth, Docker, and broader infra that exceed MVP scope (no storage/auth for now).
 
 2) Minimal dual-starter: FastAPI backend + Vite React frontend
-- Pros: matches learning goals, keeps MVP small, aligns with workplace stack (FastAPI), preserves easy path to future AWS deployment.
+- Pros: matches learning goals, keeps MVP small, aligns with workplace stack (FastAPI), and maps cleanly to Render hosting.
 - Cons: requires us to define integration conventions ourselves (API client contracts, repo structure, dev scripts).
 
 ### Selected Starter: Minimal Dual-Starter (FastAPI + Vite React)
 
 **Rationale for Selection:**
-This option best matches MVP constraints: local laptop deployment, no persistence yet, React frontend learning, and FastAPI alignment with workplace practice. It minimizes accidental complexity while keeping architecture extensible for future AWS migration (S3/CloudFront + Lambda-style backend evolution).
+This option best matches MVP constraints: local laptop deployment, no persistence yet, React frontend learning, and FastAPI alignment with workplace practice. It minimizes accidental complexity while keeping architecture extensible for straightforward Render deployment and later cloud changes if the product outgrows the MVP platform.
 
 **Initialization Command:**
 
@@ -120,14 +120,14 @@ npm create vite@latest frontend -- --template react
 - Authentication: none for MVP, but include CORS allowlist and optional API-key feature flag path.
 - Processing pattern: synchronous endpoint for MVP behavior, with async job model designed in contracts for later expansion.
 - Frontend data layer: TanStack Query for request/cache lifecycle and learning value.
-- Future cloud target: AWS S3/CloudFront (frontend) + Lambda/API Gateway (backend evolution path).
+- Hosted deployment target: Render static site (frontend) + Render web service (backend).
 - OCR Provider: Google Cloud Vision (`DOCUMENT_TEXT_DETECTION`) selected over AWS Textract. Textract does not support Chinese script. GCV plugs directly into the `OcrProvider` protocol adapter with no upstream code changes required.
 
 **Deferred Decisions (Post-MVP):**
-- Persistent history store (candidate: DynamoDB + S3 object artifacts).
-- Full async queue execution (SQS + worker Lambda/ECS).
-- Terraform IaC deployment pipeline for AWS environments.
-- Production auth (Apple ID or Cognito-backed flow).
+- Persistent history store (candidate: PostgreSQL + S3-compatible object artifacts).
+- Full async queue execution (candidate: background worker plus managed queue if synchronous processing becomes limiting).
+- Render deployment automation (`render.yaml`) and environment promotion workflow.
+- Production auth (Apple ID or equivalent external identity flow).
 
 ### Data Architecture
 
@@ -135,8 +135,8 @@ npm create vite@latest frontend -- --template react
 - Use an internal repository interface from day 1 so persistence can be added without API contract rewrites.
 - Store transient processing artifacts in-memory or temp filesystem only for current request lifecycle.
 - Define future adapters:
-  - `HistoryRepository` (DynamoDB candidate)
-  - `ArtifactStore` (S3 candidate)
+  - `HistoryRepository` (PostgreSQL candidate)
+  - `ArtifactStore` (S3-compatible object storage candidate)
 
 ### Authentication & Security
 
@@ -173,11 +173,12 @@ npm create vite@latest frontend -- --template react
 - Compose spec (v2 CLI) with at least:
   - `backend` service (FastAPI)
   - `frontend` service (Vite dev or static build serve profile)
-- Future AWS target architecture:
-  - Frontend: S3 + CloudFront
-  - Backend: Lambda + API Gateway
-  - Storage (later): DynamoDB + S3
-- IaC direction: Terraform for AWS provisioning in post-MVP phase.
+- Hosted target architecture:
+  - Frontend: Render static site
+  - Backend: Render web service
+  - Error tracking: Sentry
+  - Storage (later): managed Postgres and S3-compatible object storage if history/artifacts move beyond MVP
+- Deployment configuration direction: Render Blueprint via `render.yaml` when hosted deployment work begins.
 
 ### Decision Impact Analysis
 
@@ -188,7 +189,8 @@ npm create vite@latest frontend -- --template react
 4. Add TanStack Query frontend flow for upload/process/result.
 5. Add Docker Compose local orchestration.
 6. Introduce async-ready response contract fields (without queue infra yet).
-7. Add persistence and AWS Terraform modules in later iterations.
+7. Add Sentry integration and Render deployment configuration in later iterations.
+8. Add persistence and background-job infrastructure in later iterations if usage justifies it.
 
 **Cross-Component Dependencies:**
 - Async-ready API envelope affects backend handlers and frontend response handling.
@@ -445,7 +447,7 @@ test-bmad/
 
 **Data Boundaries:**
 - MVP uses ephemeral/in-memory storage adapters.
-- Repository interfaces in `adapters/storage` define future persistence contract (DynamoDB/S3).
+- Repository interfaces in `adapters/storage` define future persistence contract (PostgreSQL/S3-compatible object storage).
 - No service directly depends on a concrete cloud SDK in MVP core flow.
 
 ### Requirements to Structure Mapping
@@ -474,7 +476,8 @@ test-bmad/
 - OCR provider via `ocr_provider.py` (Google Cloud Vision — `DOCUMENT_TEXT_DETECTION`; supports Simplified and Traditional Chinese). AWS Textract was evaluated but does not support Chinese script.
 - Pinyin conversion provider via `pinyin_provider.py`.
 - Optional telemetry sink via `telemetry_provider.py`.
-- Future AWS resources via `infra/terraform/*`.
+- Error tracking via Sentry SDKs in backend and frontend.
+- Future deployment configuration via `render.yaml` and service-level environment settings.
 
 **Data Flow:**
 - Upload from React -> `POST /v1/process` -> process orchestration -> envelope response -> React result + diagnostics.
@@ -509,14 +512,14 @@ test-bmad/
 
 **Deployment Structure:**
 - Current local deployment via Docker Compose.
-- Future AWS deployment mapped in `infra/terraform` with module boundaries aligned to S3/CloudFront and Lambda/API Gateway.
+- Hosted deployment target is Render, with frontend and backend split into separate services and optional Blueprint-based config in `render.yaml`.
 
 ## Architecture Validation Results
 
 ### Coherence Validation ✅
 
 **Decision Compatibility:**
-All major choices are compatible: Python/FastAPI backend, React/Vite frontend, REST `/v1` API, Docker Compose local runtime, and AWS-forward migration path. Async-ready response contracts are compatible with current synchronous MVP execution.
+All major choices are compatible: Python/FastAPI backend, React/Vite frontend, REST `/v1` API, Docker Compose local runtime, Render hosting target, and Sentry-based monitoring. Async-ready response contracts are compatible with current synchronous MVP execution.
 
 **Pattern Consistency:**
 Implementation patterns (naming, response envelopes, error taxonomy, query-key patterns, and layering boundaries) align with the selected technology stack and with the multi-agent consistency objective.
@@ -545,7 +548,7 @@ NFRs are covered through architecture and constraints:
 - performance target support via lean MVP pipeline
 - security baseline (CORS, size/type limits, env secrets, TLS when deployed)
 - observability and diagnostic structure
-- extensibility for AWS and async evolution
+- extensibility for Render deployment now and background-job evolution later
 
 ### Implementation Readiness Validation ✅
 
@@ -570,7 +573,7 @@ Conflict-prone areas are addressed with consistent rules and examples suitable f
 **Nice-to-Have Gaps:**
 - explicit API contract test fixture catalog
 - standardized observability dashboard template
-- Terraform environment promotion workflow details
+- Render Blueprint/environment promotion workflow details
 
 ### Validation Issues Addressed
 
@@ -612,7 +615,7 @@ No blocking issues were found. Scope-risk concern around async processing was re
 - clear MVP scope control with future-ready seams
 - strong multi-agent consistency rules
 - explicit backend/frontend boundaries and response contracts
-- workplace-aligned technology and future AWS/Terraform trajectory
+- workplace-aligned technology and low-friction Render/Sentry operations path
 
 **Areas for Future Enhancement:**
 - activate async queue path

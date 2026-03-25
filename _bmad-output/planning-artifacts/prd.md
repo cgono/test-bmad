@@ -120,7 +120,7 @@ A second edge case appears when the source page already includes Chinese charact
 
 ### Journey 3: Admin/Operations Journey (Cost and Usage Control)
 
-In admin mode (same user, different role), Clint reviews a lightweight ops panel to understand usage, latency, and cost. He monitors per-request timings, error rates, and cost estimates for OCR/LLM/tool calls. The immediate objective is to keep the weekend prototype affordable while learning observability patterns (including optional Datadog instrumentation). Later, this same path expands to saved book management and deployment health checks.
+In admin mode (same user, different role), Clint reviews a lightweight ops panel to understand usage, latency, and cost. He monitors per-request timings, error rates, and cost estimates for OCR/LLM/tool calls. The immediate objective is to keep the weekend prototype affordable while learning observability patterns using Sentry for error and performance monitoring. Later, this same path expands to saved book management and deployment health checks.
 
 Success in this journey is operational confidence: the app is cheap enough to run, issues are observable, and system behavior is measurable.
 
@@ -141,7 +141,7 @@ This journey ensures MVP can evolve into reusable LangChain-backed services with
 These journeys imply capability requirements in five areas:
 - Core processing: photo upload, quality validation, OCR, Chinese-text filtering, pinyin generation, result rendering.
 - Error handling: confidence-aware output, mixed-language filtering, explicit fallback paths for wrong OCR and low-quality images.
-- Observability: request timing, error tracking, cost/usage instrumentation, optional Datadog integration.
+- Observability: request timing, error tracking, cost/usage instrumentation, and Sentry integration.
 - Diagnostics UX: collapsible same-page debug block with raw OCR + trace + timings for self-support.
 - Extensibility: architecture that cleanly adds audio pronunciation, translation, and saved-book compilation later.
 
@@ -205,7 +205,7 @@ MVP endpoint groups:
 - Keep MVP minimal: basic HTTP API + frontend only; no SDK.
 - Prioritize deterministic response structure and clear failure responses.
 - Include diagnostics in response model to support self-debug workflow.
-- Ensure health/metrics endpoints are useful enough for optional Datadog instrumentation.
+- Ensure health/metrics endpoints are useful enough for Sentry-backed troubleshooting and lightweight dashboarding.
 
 ## Project Scoping & Phased Development
 
@@ -239,7 +239,7 @@ Deliver one reliable reading-assist workflow while exposing enough internals (di
 - Audio pronunciation output
 - English translation
 - Better image robustness (lighting, skew, layout)
-- Deeper Datadog integration
+- Deeper Sentry dashboarding and alerting
 
 **Phase 3 (Expansion):**
 - Personal book compilation workflow (save/reload full books)
@@ -298,9 +298,10 @@ Mitigation: single public processing endpoint, minimal auth, no SDK, strict MVP 
 - FR23: System can expose confidence indicators for extracted text.
 - FR24: System can expose request timing details for each processing run.
 - FR25: System can expose LangChain/tool execution trace data for debugging.
-- FR26: System can emit usage and error telemetry suitable for optional Datadog integration.
+- FR26: System can emit usage and error telemetry suitable for Sentry error and performance monitoring.
 - FR27: System can provide service health status via API endpoint.
 - FR28: System can provide operational metrics via API endpoint.
+- FR41: System can be deployed to Render using a static frontend service and web-service backend.
 
 ### Cost Control & Usage Governance
 
@@ -353,7 +354,7 @@ Mitigation: single public processing endpoint, minimal auth, no SDK, strict MVP 
 ### Observability & Diagnostics
 
 - The system should expose request timings, OCR confidence indicators, and processing traces for debugging.
-- The system should emit telemetry compatible with optional Datadog ingestion.
+- The system should emit telemetry and error events compatible with Sentry monitoring.
 - Error events should include reason categories to support rapid root-cause identification.
 
 ### Integration
@@ -361,3 +362,4 @@ Mitigation: single public processing endpoint, minimal auth, no SDK, strict MVP 
 - API contracts should be versioned under `/v1` and remain backward compatible for non-breaking changes.
 - The backend should provide JSON responses for API consumers and support rendered HTML flow for phone web usage.
 - The design should preserve extensibility for future audio, translation, and personal book-compilation integrations.
+- The hosted production target should be Render, while local development continues to use Docker Compose.

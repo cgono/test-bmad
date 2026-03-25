@@ -45,7 +45,7 @@ FR22: System can expose raw OCR output for troubleshooting.
 FR23: System can expose confidence indicators for extracted text.
 FR24: System can expose request timing details for each processing run.
 FR25: System can expose LangChain/tool execution trace data for debugging.
-FR26: System can emit usage and error telemetry suitable for optional Datadog integration.
+FR26: System can emit usage and error telemetry suitable for Sentry error and performance monitoring.
 FR27: System can provide service health status via API endpoint.
 FR28: System can provide operational metrics via API endpoint.
 FR29: System can estimate per-request processing cost.
@@ -69,7 +69,7 @@ NFR3: The processing pipeline should return a structured outcome for every reque
 NFR4: The system should fail gracefully on low-quality images, OCR uncertainty, or provider/tool errors, with retry guidance.
 NFR5: All network traffic should use TLS in transit, with secrets managed outside source code.
 NFR6: The system should track per-request and daily estimated processing cost, and enforce or warn at approximately 1 SGD/day.
-NFR7: The system should expose timings, confidence indicators, and traces for debugging, and emit telemetry compatible with optional Datadog ingestion.
+NFR7: The system should expose timings, confidence indicators, and traces for debugging, and emit telemetry compatible with Sentry monitoring.
 NFR8: API contracts should be versioned under /v1 and remain backward compatible for non-breaking changes.
 NFR9: The architecture should preserve extensibility for future audio, translation, and personal book-compilation integrations.
 
@@ -119,7 +119,7 @@ FR22: Epic 3 - raw OCR visibility
 FR23: Epic 3 - confidence indicators exposure
 FR24: Epic 3 - per-request timing details
 FR25: Epic 3 - LangChain/tool trace exposure
-FR26: Epic 3 - telemetry emission for optional Datadog
+FR26: Epic 3 - telemetry emission for Sentry monitoring
 FR27: Epic 3 - health endpoint
 FR28: Epic 3 - metrics endpoint
 FR29: Epic 4 - per-request cost estimation
@@ -447,23 +447,41 @@ So that I can monitor runtime behavior and troubleshoot quickly.
 **Then** structured metrics are returned for local monitoring use
 **And** response format stays consistent with versioned API conventions.
 
-### Story 3.4: Emit Telemetry for Optional Datadog-Compatible Ingestion
+### Story 3.4: Integrate Sentry Error and Performance Monitoring
 
 As Clint,
-I want usage/error telemetry emitted in a consistent schema,
-So that optional Datadog integration can be added without rework.
+I want backend and frontend failures captured in Sentry with request context and performance traces,
+So that I can troubleshoot production issues quickly without adopting a heavyweight observability stack.
 
 **Acceptance Criteria:**
 
 **Given** processing requests execute across success/partial/error paths
-**When** telemetry events are emitted
-**Then** they include key fields (request id, status category, timing, error category where applicable)
-**And** schema stays consistent for downstream ingestion adapters.
+**When** exceptions, typed warnings, or slow traces occur
+**Then** Sentry captures the event with key fields (request id, status category, timing, error category where applicable)
+**And** release/environment tags are included for triage.
 
-**Given** telemetry destination is unavailable or disabled
-**When** emission is attempted
+**Given** Sentry is unavailable or disabled
+**When** instrumentation is attempted
 **Then** core processing flow still completes
-**And** telemetry failures do not break user responses.
+**And** monitoring failures do not break user responses.
+
+### Story 3.5: Deploy Frontend and Backend to Render
+
+As Clint,
+I want the frontend and backend deployed to Render,
+So that the project runs on its chosen hosted platform with a repeatable production setup.
+
+**Acceptance Criteria:**
+
+**Given** the repository is connected to Render
+**When** deployment configuration is applied
+**Then** the frontend is served from a Render static site
+**And** the backend runs as a Render web service with required environment variables configured.
+
+**Given** the hosted services are deployed
+**When** I open the production app
+**Then** the frontend can call the backend successfully over HTTPS
+**And** health checks and basic rollback/redeploy steps are documented.
 
 ## Epic 4: Cost Guardrails & Safe Usage Control
 
