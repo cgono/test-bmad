@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-25"  # updated: story 2-4 review
+last_updated: "2026-03-25"  # updated: epic-2-retrospective done
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -57,7 +57,7 @@ development_status:
   2-2-align-pinyin-output-with-source-text-segments: done
   2-3-return-partial-results-with-explicit-failure-categories: done
   2-4-add-low-confidence-guidance-and-in-flow-retry: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-capture-request-metadata-and-structured-diagnostics-payload: backlog
