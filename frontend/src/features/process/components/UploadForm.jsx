@@ -51,6 +51,8 @@ export default function UploadForm() {
       return
     }
     const url = URL.createObjectURL(file)
+    // URL.createObjectURL always returns a blob: URL; validate scheme before use
+    if (!url.startsWith('blob:')) return
     setPreviewUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [file])
