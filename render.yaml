@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: ocr-pinyin-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install "uv==0.10.11" && uv sync --no-dev --frozen
+    startCommand: APP_VERSION=$(python -c "import tomllib; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['version'])") uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: OCR_PROVIDER
+        value: google_vision
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.2"
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+
+  - type: web
+    name: ocr-pinyin-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && VITE_APP_VERSION=$(node -p "require('./package.json').version") npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_APP_ENV
+        value: production
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_TRACES_SAMPLE_RATE
+        value: "0.2"
