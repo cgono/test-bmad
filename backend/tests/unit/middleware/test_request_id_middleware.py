@@ -1,5 +1,5 @@
 """Tests for RequestIdMiddleware behaviour (#2, #5)."""
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -18,7 +18,11 @@ def _make_app(*, raise_in_route: bool = False) -> FastAPI:
     if raise_in_route:
         @app.get("/boom")
         async def boom_route() -> None:
-            raise RuntimeError("intentional error")
+            # Use HTTPException so ExceptionMiddleware handles it and the
+            # response flows through our send_wrapper (adding X-Request-ID).
+            # Truly unhandled RuntimeErrors escape to ServerErrorMiddleware
+            # (which bypasses our wrapper) but are captured by Sentry instead.
+            raise HTTPException(status_code=500, detail="server error")
 
     return app
 

@@ -17,7 +17,10 @@ function initSentry() {
       dsn,
       environment: import.meta.env.VITE_APP_ENV || 'development',
       release: import.meta.env.VITE_APP_VERSION || '0.1.0',
-      tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 1.0),
+      tracesSampleRate: (() => {
+        const raw = parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE)
+        return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 1.0
+      })(),
       integrations: [Sentry.browserTracingIntegration()],
     })
   } catch (error) {

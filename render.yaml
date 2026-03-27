@@ -2,6 +2,7 @@ services:
   - type: web
     name: ocr-pinyin-backend
     runtime: python
+    pythonVersion: "3.12"
     rootDir: backend
     buildCommand: pip install "uv==0.10.11" && uv sync --no-dev --frozen
     startCommand: APP_VERSION=$(python -c "import tomllib; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['version'])") uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
