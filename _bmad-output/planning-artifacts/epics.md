@@ -155,7 +155,11 @@ Enable debugging and runtime visibility with collapsible diagnostics, trace/timi
 
 ### Epic 4: UX Polish, Cost Guardrails & Safe Usage Control
 Refine the capture-to-result experience based on live MVP testing, and keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+### Epic 4: UX Polish, Cost Guardrails & Safe Usage Control
+Refine the capture-to-result experience based on live MVP testing, and keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
 **Depends on:** Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)
+**FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
+**Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 **FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
 **Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 
@@ -669,6 +673,24 @@ So that I avoid accidental overspend beyond the daily limit.
 **Then** system blocks further expensive processing with structured budget category response
 **And** user receives clear guidance on next steps.
 
+### Story 4.6: Restrict Oversized or High-Cost Inputs
+
+As Clint,
+I want oversized or risky uploads constrained up front,
+So that accidental high-cost requests are prevented.
+
+**Acceptance Criteria:**
+
+**Given** an upload exceeds configured size/type/policy constraints
+**When** request intake validation runs
+**Then** request is rejected with structured validation/budget-safe error
+**And** message includes concrete corrective guidance.
+
+**Given** an upload is within safe bounds
+**When** intake validation completes
+**Then** request proceeds to processing pipeline
+**And** guardrail checks are logged for audit/diagnostic context.
+
 ### Story 4.7: Release-Please Versioning + render.yaml CI Validation
 
 As Clint,
@@ -704,24 +726,6 @@ So that I never manually bump versions or publish releases, and a malformed rend
 **Then** all existing jobs continue to pass unaffected
 
 **Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
-
-### Story 4.6: Restrict Oversized or High-Cost Inputs
-
-As Clint,
-I want oversized or risky uploads constrained up front,
-So that accidental high-cost requests are prevented.
-
-**Acceptance Criteria:**
-
-**Given** an upload exceeds configured size/type/policy constraints
-**When** request intake validation runs
-**Then** request is rejected with structured validation/budget-safe error
-**And** message includes concrete corrective guidance.
-
-**Given** an upload is within safe bounds
-**When** intake validation completes
-**Then** request proceeds to processing pipeline
-**And** guardrail checks are logged for audit/diagnostic context.
 
 ## Epic 5: History, Reuse & Future Evolution
 
