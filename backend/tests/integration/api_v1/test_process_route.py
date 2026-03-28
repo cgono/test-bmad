@@ -11,6 +11,8 @@ from app.adapters.pinyin_provider import (
     RawPinyinSegment,
 )
 from app.api.v1.process import process_image
+from app.schemas.diagnostics import CostEstimate
+from app.services import budget_service
 from app.services.image_validation import MAX_FILE_SIZE_BYTES
 
 
@@ -26,6 +28,25 @@ class StubPinyinProvider:
 class FailingPinyinProvider:
     def generate(self, *, text: str) -> list[RawPinyinSegment]:
         raise PinyinProviderUnavailableError("pinyin unavailable")
+
+
+def _reset_daily_costs() -> None:
+    budget_service.daily_cost_store.__dict__.update(
+        budget_service.DailyCostStore().__dict__
+    )
+
+
+@pytest.fixture(autouse=True)
+def _clean_daily_cost_store() -> None:
+    _reset_daily_costs()
+
+
+def _set_today_spend_sgd(sgd: float) -> None:
+    _reset_daily_costs()
+    estimated_usd = round(sgd / budget_service._USD_TO_SGD, 8)
+    budget_service.record_request_cost(
+        CostEstimate(estimated_usd=estimated_usd, estimated_sgd=sgd, confidence="full")
+    )
 
 
 def test_process_route_returns_envelope() -> None:
@@ -356,3 +377,168 @@ def test_process_route_mixed_segments_returns_aligned_and_uncertain() -> None:
     assert response.data.pinyin.segments[1].alignment_status == "uncertain"
     assert response.data.pinyin.segments[1].reason_code == "pinyin_execution_failed"
     assert response.data.pinyin.segments[1].source_text == "世界"
+
+
+def test_process_route_block_mode_with_exceeded_budget_returns_budget_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OCR_PROVIDER", "google_vision")
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "block")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "1.0")
+    _set_today_spend_sgd(1.0)
+
+    with patch("app.services.ocr_service.get_ocr_provider") as get_ocr_provider:
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.category == "budget"
+    assert response.error.code == "budget_daily_limit_exceeded"
+    get_ocr_provider.assert_not_called()
+
+
+def test_process_route_warn_mode_with_approaching_budget_returns_budget_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OCR_PROVIDER", "google_vision")
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "warn")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "1.0")
+    _set_today_spend_sgd(0.8)
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider([RawOcrSegment(text="你好", language="zh", confidence=0.98)]),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.warnings is not None
+    warning_codes = {warning.code for warning in response.warnings}
+    assert "budget_approaching_daily_limit" in warning_codes
+
+
+def test_process_route_warn_mode_with_exceeded_budget_returns_budget_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OCR_PROVIDER", "google_vision")
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "warn")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "1.0")
+    _set_today_spend_sgd(1.0)
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.98)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.warnings is not None
+    warning_codes = {warning.code for warning in response.warnings}
+    assert "budget_daily_limit_reached" in warning_codes
+
+
+def test_process_route_warn_mode_success_is_downgraded_to_partial_with_budget_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OCR_PROVIDER", "google_vision")
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "warn")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "1.0")
+    _set_today_spend_sgd(0.8)
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.98)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.data is not None
+    assert response.error is None
+    assert response.warnings is not None
+    warning_codes = {warning.code for warning in response.warnings}
+    assert "budget_approaching_daily_limit" in warning_codes
+
+
+def test_process_route_below_budget_threshold_has_no_budget_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OCR_PROVIDER", "google_vision")
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "warn")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "1.0")
+    _set_today_spend_sgd(0.79)
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.98)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "success"
+    assert response.warnings is None
+
+
+def test_process_route_non_gcv_provider_never_triggers_budget_enforcement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OCR_PROVIDER", raising=False)
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "block")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "0.01")
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.98)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "success"
+    assert response.error is None
+    assert response.warnings is None

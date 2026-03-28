@@ -1,10 +1,13 @@
 import datetime
+import math
 import os
+from typing import Literal
 
 from app.schemas.diagnostics import CostEstimate
 
 _GCV_USD_PER_IMAGE = 0.0015
 _USD_TO_SGD = 1.35
+_BUDGET_WARN_FRACTION = 0.8
 
 
 def estimate_request_cost(*, file_size_bytes: int) -> CostEstimate:  # noqa: ARG001
@@ -53,3 +56,29 @@ daily_cost_store = DailyCostStore()
 def record_request_cost(cost_estimate: CostEstimate) -> None:
     """Record the cost of a request that is about to attempt OCR (GCV will be billed)."""
     daily_cost_store.record(cost_estimate)
+
+
+def check_budget_threshold() -> Literal["ok", "warn", "exceeded"]:
+    """Check today's spend against the configured daily budget."""
+    try:
+        budget_sgd = float(os.environ.get("DAILY_BUDGET_SGD", "1.0"))
+    except ValueError:
+        budget_sgd = 1.0
+    if not math.isfinite(budget_sgd) or budget_sgd <= 0:
+        budget_sgd = 1.0
+
+    today = datetime.date.today().isoformat()
+    snapshot = daily_cost_store.snapshot()
+    today_sgd = float(snapshot.get(today, {}).get("total_sgd", 0.0))
+
+    if today_sgd >= budget_sgd:
+        return "exceeded"
+    if today_sgd >= budget_sgd * _BUDGET_WARN_FRACTION:
+        return "warn"
+    return "ok"
+
+
+def get_budget_enforce_mode() -> Literal["warn", "block"]:
+    """Read the budget enforcement mode from the environment."""
+    mode = os.environ.get("BUDGET_ENFORCE_MODE", "warn").strip().lower()
+    return "block" if mode == "block" else "warn"

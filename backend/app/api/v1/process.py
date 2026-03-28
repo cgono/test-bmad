@@ -300,9 +300,53 @@ async def process_image(
     except ImageValidationError as error:
         return _build_validation_error_response(request_id=request_id, error=error)
 
-    return await _build_process_response(
+    budget_threshold = budget_service.check_budget_threshold()
+    enforce_mode = budget_service.get_budget_enforce_mode()
+
+    if budget_threshold == "exceeded" and enforce_mode == "block":
+        _set_sentry_tag("outcome", "error")
+        _set_sentry_tag("error_category", "budget")
+        metrics_store.increment("error")
+        return ProcessResponse(
+            status="error",
+            request_id=request_id,
+            error=ProcessError(
+                category="budget",
+                code="budget_daily_limit_exceeded",
+                message="Daily processing budget has been reached. Please try again tomorrow.",
+            ),
+        )
+
+    budget_warn: ProcessWarning | None = None
+    if budget_threshold in ("warn", "exceeded"):
+        budget_warn = ProcessWarning(
+            category="budget",
+            code=(
+                "budget_daily_limit_reached"
+                if budget_threshold == "exceeded"
+                else "budget_approaching_daily_limit"
+            ),
+            message=(
+                "Daily processing budget has been reached. Results may be limited soon."
+                if budget_threshold == "exceeded"
+                else "Daily processing budget is nearly reached."
+            ),
+        )
+
+    response = await _build_process_response(
         file_bytes,
         content_type,
         request_id=request_id,
         start_time=start_time,
     )
+
+    if budget_warn is not None and response.status != "error":
+        return ProcessResponse(
+            status="partial",
+            request_id=response.request_id,
+            data=response.data,
+            warnings=(response.warnings or []) + [budget_warn],
+            diagnostics=response.diagnostics,
+        )
+
+    return response
