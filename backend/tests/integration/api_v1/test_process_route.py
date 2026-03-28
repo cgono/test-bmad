@@ -1,6 +1,7 @@
 import asyncio
 from unittest.mock import patch
 
+import pytest
 from helpers import PNG_1X1_BYTES, StubOcrProvider, _request_with_body
 
 from app.adapters.ocr_provider import RawOcrSegment
@@ -52,7 +53,10 @@ def test_process_route_invalid_upload_returns_validation_error() -> None:
     assert isinstance(response.error.message, str)
 
 
-def test_process_route_valid_upload_returns_success_with_ocr_and_pinyin() -> None:
+def test_process_route_valid_upload_returns_success_with_ocr_and_pinyin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OCR_PROVIDER", raising=False)
     pinyin_segments = [
         RawPinyinSegment(hanzi="你", pinyin="nǐ"),
         RawPinyinSegment(hanzi="好", pinyin="hǎo"),
@@ -90,6 +94,9 @@ def test_process_route_valid_upload_returns_success_with_ocr_and_pinyin() -> Non
     assert response.diagnostics.timing.ocr_ms >= 0.0
     assert response.diagnostics.timing.pinyin_ms >= 0.0
     assert len(response.diagnostics.trace.steps) >= 2
+    assert response.diagnostics.cost_estimate is not None
+    assert response.diagnostics.cost_estimate.confidence == "unavailable"
+    assert response.diagnostics.cost_estimate.estimated_usd is None
 
 
 def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
@@ -104,6 +111,7 @@ def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
     assert response.error is not None
     assert response.error.category == "ocr"
     assert response.error.code == "ocr_no_text_detected"
+    assert response.diagnostics is None
 
 
 def test_process_route_non_chinese_only_returns_ocr_no_chinese_text_error() -> None:
@@ -125,7 +133,10 @@ def test_process_route_non_chinese_only_returns_ocr_no_chinese_text_error() -> N
     assert response.error.code == "ocr_no_chinese_text"
 
 
-def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:
+def test_process_route_pinyin_failure_returns_typed_pinyin_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OCR_PROVIDER", raising=False)
     with patch(
         "app.services.ocr_service.get_ocr_provider",
         return_value=StubOcrProvider(
@@ -151,6 +162,8 @@ def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:
     assert response.diagnostics.timing.total_ms >= 0.0
     assert response.diagnostics.timing.ocr_ms >= 0.0
     assert response.diagnostics.timing.pinyin_ms >= 0.0
+    assert response.diagnostics.cost_estimate is not None
+    assert response.diagnostics.cost_estimate.confidence == "unavailable"
 
 
 def test_process_route_pinyin_failure_partial_preserves_ocr() -> None:
@@ -202,8 +215,11 @@ def test_process_route_enforces_size_limit_without_content_length_header() -> No
     assert response.diagnostics is None
 
 
-def test_process_route_low_confidence_ocr_returns_partial_with_guidance() -> None:
+def test_process_route_low_confidence_ocr_returns_partial_with_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Low-confidence OCR segments with successful pinyin returns partial with guidance warning."""
+    monkeypatch.delenv("OCR_PROVIDER", raising=False)
     with patch(
         "app.services.ocr_service.get_ocr_provider",
         return_value=StubOcrProvider(
@@ -229,6 +245,8 @@ def test_process_route_low_confidence_ocr_returns_partial_with_guidance() -> Non
     assert response.diagnostics.timing.total_ms >= 0.0
     assert response.diagnostics.timing.ocr_ms >= 0.0
     assert response.diagnostics.timing.pinyin_ms >= 0.0
+    assert response.diagnostics.cost_estimate is not None
+    assert response.diagnostics.cost_estimate.confidence == "unavailable"
 
 
 def test_process_route_low_confidence_includes_both_ocr_and_pinyin_data() -> None:

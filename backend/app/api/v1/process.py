@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, UploadFile
 
 from app.core.metrics import metrics_store
 from app.schemas.diagnostics import (
+    CostEstimate,
     DiagnosticsPayload,
     TimingInfo,
     TraceInfo,
@@ -13,6 +14,7 @@ from app.schemas.diagnostics import (
     UploadContext,
 )
 from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse, ProcessWarning
+from app.services import budget_service
 from app.services.diagnostics_service import build_diagnostics
 from app.services.image_validation import (
     ALLOWED_IMAGE_MIME_TYPES,
@@ -63,6 +65,7 @@ def _make_diagnostics(
     ocr_ms: float,
     pinyin_ms: float,
     trace_steps: list[TraceStep],
+    cost_estimate: CostEstimate | None,
 ) -> DiagnosticsPayload:
     return build_diagnostics(
         upload_context=upload_context,
@@ -72,6 +75,7 @@ def _make_diagnostics(
             pinyin_ms=pinyin_ms,
         ),
         trace=TraceInfo(steps=trace_steps),
+        cost_estimate=cost_estimate,
     )
 
 
@@ -98,6 +102,9 @@ async def _build_process_response(
     upload_context = UploadContext(
         content_type=content_type,
         file_size_bytes=len(image_bytes) if image_bytes else 0,
+    )
+    cost_estimate = budget_service.estimate_request_cost(
+        file_size_bytes=upload_context.file_size_bytes
     )
     trace_steps: list[TraceStep] = []
 
@@ -146,6 +153,7 @@ async def _build_process_response(
             ocr_ms=ocr_ms,
             pinyin_ms=pinyin_ms,
             trace_steps=trace_steps,
+            cost_estimate=cost_estimate,
         )
         metrics_store.increment("partial")
         return ProcessResponse(
@@ -174,6 +182,7 @@ async def _build_process_response(
             ocr_ms=ocr_ms,
             pinyin_ms=pinyin_ms,
             trace_steps=trace_steps,
+            cost_estimate=cost_estimate,
         )
         metrics_store.increment("partial")
         return ProcessResponse(
@@ -204,6 +213,7 @@ async def _build_process_response(
         ocr_ms=ocr_ms,
         pinyin_ms=pinyin_ms,
         trace_steps=trace_steps,
+        cost_estimate=cost_estimate,
     )
     metrics_store.increment("success")
     return ProcessResponse(
