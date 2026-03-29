@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from helpers import PNG_1X1_BYTES, StubOcrProvider, _request_with_body
 
-from app.adapters.ocr_provider import RawOcrSegment
+from app.adapters.ocr_provider import ProviderUnavailableError, RawOcrSegment
 from app.adapters.pinyin_provider import (
     PinyinExecutionError,
     PinyinProviderUnavailableError,
@@ -563,3 +563,32 @@ def test_process_route_non_gcv_provider_never_triggers_budget_enforcement(
     assert response.status == "success"
     assert response.error is None
     assert response.warnings is None
+
+
+def test_process_route_ocr_provider_failure_does_not_record_budget_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cost must not be charged when the OCR provider is unavailable (no billable call made)."""
+    monkeypatch.setenv("OCR_PROVIDER", "google_vision")
+    monkeypatch.setenv("BUDGET_ENFORCE_MODE", "block")
+    monkeypatch.setenv("DAILY_BUDGET_SGD", "1.0")
+
+    class FailingOcrProvider:
+        def extract(self, *, image_bytes: bytes, content_type: str) -> list[RawOcrSegment]:
+            raise ProviderUnavailableError("credentials unavailable")
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=FailingOcrProvider(),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.code == "ocr_provider_unavailable"
+    # Budget must be zero — no billable OCR call was made
+    import datetime
+    today = datetime.date.today().isoformat()
+    today_usd = budget_service.daily_cost_store.snapshot().get(today, {}).get("total_usd", 0.0)
+    assert today_usd == 0.0
