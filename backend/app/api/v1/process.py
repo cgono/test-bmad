@@ -124,11 +124,11 @@ async def _build_process_response(
             ),
         )
 
-    budget_service.record_request_cost(cost_estimate)
     ocr_start = time.monotonic()
     try:
         segments = await extract_chinese_segments(image_bytes, content_type)
         ocr_ms = (time.monotonic() - ocr_start) * 1000
+        budget_service.record_request_cost(cost_estimate)
         trace_steps.append(TraceStep(step="ocr", status="ok"))
     except OcrServiceError as error:
         trace_steps.append(TraceStep(step="ocr", status="failed"))

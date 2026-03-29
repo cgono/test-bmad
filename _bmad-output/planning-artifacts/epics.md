@@ -44,7 +44,7 @@ FR21: User can view diagnostics in a collapsible section on the result page.
 FR22: System can expose raw OCR output for troubleshooting.
 FR23: System can expose confidence indicators for extracted text.
 FR24: System can expose request timing details for each processing run.
-FR25: System can expose LangChain/tool execution trace data for debugging.
+FR25: System can expose tool execution trace data for debugging.
 FR26: System can emit usage and error telemetry suitable for Sentry error and performance monitoring.
 FR27: System can provide service health status via API endpoint.
 FR28: System can provide operational metrics via API endpoint.
@@ -155,7 +155,11 @@ Enable debugging and runtime visibility with collapsible diagnostics, trace/timi
 
 ### Epic 4: UX Polish, Cost Guardrails & Safe Usage Control
 Refine the capture-to-result experience based on live MVP testing, and keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+### Epic 4: UX Polish, Cost Guardrails & Safe Usage Control
+Refine the capture-to-result experience based on live MVP testing, and keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
 **Depends on:** Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)
+**FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
+**Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 **FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
 **Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 
@@ -722,6 +726,42 @@ So that accidental high-cost requests are prevented.
 **When** intake validation completes
 **Then** request proceeds to processing pipeline
 **And** guardrail checks are logged for audit/diagnostic context.
+
+### Story 4.7: Release-Please Versioning + render.yaml CI Validation
+
+As Clint,
+I want frontend and backend versions incremented automatically based on conventional commits with GitHub Releases created on merge, AND I want render.yaml validated in CI,
+So that I never manually bump versions or publish releases, and a malformed render.yaml is caught before it reaches a deploy.
+
+**Acceptance Criteria:**
+
+**Given** conventional commits have been merged to main
+**When** the release-please workflow runs
+**Then** a "release PR" is opened (or updated) with CHANGELOG.md updated, `frontend/package.json` version bumped, and `backend/pyproject.toml` version bumped
+
+**Given** the release PR is merged
+**When** release-please runs post-merge
+**Then** a GitHub Release is created automatically with the version tag and changelog content
+**And** frontend and backend are versioned independently (monorepo)
+
+**Given** `render.yaml` exists in the repo root
+**When** CI runs on pull requests and main/staging branch pushes
+**Then** the Render CLI downloads and runs `render blueprints validate render.yaml`, failing CI if the file fails Render's own schema validation
+**And** the check runs as a new job in the existing CI workflow
+
+**Given** `render.yaml` is valid
+**When** the check runs
+**Then** it passes and does not block merge
+
+**Given** `render.yaml` contains an invalid value or missing required field
+**When** the check runs
+**Then** CI fails with Render's validation error output
+
+**Given** all existing CI checks
+**When** story 4.7 is implemented
+**Then** all existing jobs continue to pass unaffected
+
+**Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
 
 ## Epic 5: History, Reuse & Future Evolution
 
