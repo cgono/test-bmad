@@ -88,7 +88,7 @@ export default function CropPreview({ imageUrl, onConfirm, onDismiss, disabled =
       <ReactCrop crop={crop} onChange={setCrop} onComplete={setCompletedCrop}>
         <img
           ref={imageRef}
-          src={imageUrl}
+          src={imageUrl} // codeql[js/xss-through-dom] - always a blob: URL from URL.createObjectURL
           alt="Captured photo preview"
           className="crop-preview__image"
         />
