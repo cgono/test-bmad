@@ -515,6 +515,51 @@ describe('UploadForm', () => {
     expect(screen.getByRole('button', { name: /play pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('queues the next page line after the current onend callback completes', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    let isInsideOnEnd = false
+    speechMock.speechSynthesis.speak.mockImplementation((utterance) => {
+      if (isInsideOnEnd) {
+        return
+      }
+
+      const originalOnEnd = utterance.onend
+      utterance.onend = (...args) => {
+        isInsideOnEnd = true
+        try {
+          originalOnEnd?.(...args)
+        } finally {
+          isInsideOnEnd = false
+        }
+      }
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+
+    vi.useFakeTimers()
+    try {
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+      speechMock.utterances[0].onend?.()
+
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(0)
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
+      expect(speechMock.utterances[1].text).toBe('同学们好')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('stops page playback immediately and prevents further sequence advancement', async () => {
     submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
 

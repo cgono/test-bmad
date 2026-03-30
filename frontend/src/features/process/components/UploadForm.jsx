@@ -88,6 +88,7 @@ export default function UploadForm() {
   const activeUtteranceRef = useRef(null)
   const activePlaybackModeRef = useRef(null)
   const playbackSessionRef = useRef(0)
+  const queuedPagePlaybackTimeoutRef = useRef(null)
   const ignoreNextSpeechErrorRef = useRef(false)
   const cancelPlaybackIfActiveRef = useRef(() => {})
 
@@ -164,6 +165,11 @@ export default function UploadForm() {
   const hasGroupedLines = (lineGroups?.length ?? 0) > 0
 
   function clearActivePlayback() {
+    if (queuedPagePlaybackTimeoutRef.current != null) {
+      globalThis.clearTimeout(queuedPagePlaybackTimeoutRef.current)
+      queuedPagePlaybackTimeoutRef.current = null
+    }
+
     activeLineKeyRef.current = null
     activeUtteranceRef.current = null
     activePlaybackModeRef.current = null
@@ -312,7 +318,10 @@ export default function UploadForm() {
           return
         }
 
-        startPagePlayback(nextIndex)
+        queuedPagePlaybackTimeoutRef.current = globalThis.setTimeout(() => {
+          queuedPagePlaybackTimeoutRef.current = null
+          startPagePlayback(nextIndex)
+        }, 0)
       },
     })
   }
