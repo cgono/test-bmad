@@ -61,6 +61,14 @@ function groupSegmentsByLine(segments) {
   return groups
 }
 
+function selectChineseVoice(voices) {
+  return voices.find((voice) => /^zh\b/i.test(voice.lang) || /^cmn\b/i.test(voice.lang)) ?? null
+}
+
+function buildSpokenLineText(group) {
+  return group.segments.map((segment) => segment.source_text).join('')
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -68,6 +76,13 @@ export default function UploadForm() {
   const [cameraFile, setCameraFile] = useState(null)
   const cameraInputRef = useRef(null)
   const [dismissedLowConfidence, setDismissedLowConfidence] = useState(false)
+  const [selectedVoice, setSelectedVoice] = useState(null)
+  const [speechFallbackMessage, setSpeechFallbackMessage] = useState(null)
+  const [activeLineKey, setActiveLineKey] = useState(null)
+  const activeLineKeyRef = useRef(null)
+  const activeUtteranceRef = useRef(null)
+  const ignoreNextSpeechErrorRef = useRef(false)
+  const cancelPlaybackIfActiveRef = useRef(() => {})
 
   // Create and revoke object URL when file changes
   useEffect(() => {
@@ -138,6 +153,122 @@ export default function UploadForm() {
   const pinyinSegments = mutation.data?.data?.pinyin?.segments || []
   const ocrSegments = mutation.data?.data?.ocr?.segments || []
   const isLowConfidence = mutation.data?.warnings?.some(w => w.code === 'ocr_low_confidence') ?? false
+  const lineGroups = groupSegmentsByLine(pinyinSegments)
+
+  function clearActivePlayback() {
+    activeLineKeyRef.current = null
+    activeUtteranceRef.current = null
+    setActiveLineKey(null)
+  }
+
+  function cancelPlayback() {
+    const speechSynthesis = globalThis.window?.speechSynthesis
+
+    ignoreNextSpeechErrorRef.current = true
+    clearActivePlayback()
+    speechSynthesis?.cancel?.()
+  }
+
+  cancelPlaybackIfActiveRef.current = () => {
+    if (!activeUtteranceRef.current && activeLineKeyRef.current == null) {
+      return
+    }
+
+    cancelPlayback()
+  }
+
+  useEffect(() => {
+    if (
+      typeof globalThis.window === 'undefined' ||
+      !globalThis.window.speechSynthesis ||
+      typeof globalThis.SpeechSynthesisUtterance !== 'function'
+    ) {
+      setSelectedVoice(null)
+      setSpeechFallbackMessage('Pronunciation playback is not supported in this browser.')
+      return undefined
+    }
+
+    const speechSynthesis = globalThis.window.speechSynthesis
+    const updateVoiceSelection = () => {
+      const nextVoice = selectChineseVoice(speechSynthesis.getVoices())
+
+      setSelectedVoice(nextVoice)
+      setSpeechFallbackMessage(
+        nextVoice ? null : 'Pronunciation playback is unavailable because no Chinese voice is available.'
+      )
+    }
+
+    updateVoiceSelection()
+    speechSynthesis.addEventListener?.('voiceschanged', updateVoiceSelection)
+
+    return () => {
+      speechSynthesis.removeEventListener?.('voiceschanged', updateVoiceSelection)
+      cancelPlaybackIfActiveRef.current()
+    }
+  }, [])
+
+  useEffect(() => {
+    setSpeechFallbackMessage((currentMessage) => (
+      currentMessage === 'Pronunciation playback is unavailable right now.'
+        ? null
+        : currentMessage
+    ))
+    cancelPlaybackIfActiveRef.current()
+  }, [mutation.data?.request_id])
+
+  const handleLinePlayback = (group, groupIndex) => {
+    const speechSynthesis = globalThis.window?.speechSynthesis
+    const lineText = buildSpokenLineText(group)
+    const lineKey = `${group.line_id}-${groupIndex}`
+
+    if (!speechSynthesis || !selectedVoice || !lineText) {
+      return
+    }
+
+    if (activeLineKeyRef.current === lineKey) {
+      cancelPlayback()
+      return
+    }
+
+    cancelPlayback()
+
+    try {
+      const utterance = new globalThis.SpeechSynthesisUtterance(lineText)
+      utterance.voice = selectedVoice
+      utterance.lang = selectedVoice.lang || 'zh-CN'
+      utterance.onend = () => {
+        if (activeLineKeyRef.current === lineKey) {
+          clearActivePlayback()
+        }
+        ignoreNextSpeechErrorRef.current = false
+      }
+      utterance.onerror = (event) => {
+        const isExpectedCancel =
+          ignoreNextSpeechErrorRef.current ||
+          event?.error === 'canceled' ||
+          event?.error === 'interrupted'
+
+        if (activeLineKeyRef.current === lineKey) {
+          clearActivePlayback()
+        }
+
+        if (!isExpectedCancel) {
+          setSpeechFallbackMessage('Pronunciation playback is unavailable right now.')
+        }
+
+        ignoreNextSpeechErrorRef.current = false
+      }
+
+      activeLineKeyRef.current = lineKey
+      activeUtteranceRef.current = utterance
+      setActiveLineKey(lineKey)
+      ignoreNextSpeechErrorRef.current = false
+      speechSynthesis.speak(utterance)
+    } catch {
+      clearActivePlayback()
+      setSpeechFallbackMessage('Pronunciation playback is unavailable right now.')
+    }
+  }
 
   return (
     <section>
@@ -271,38 +402,55 @@ export default function UploadForm() {
                   {pinyinSegments.length > 0 && (
                     <div aria-label="pinyin-result">
                       <h3 className="pinyin-result__title">Pinyin Reading</h3>
+                      {speechFallbackMessage && (
+                        <p className="pinyin-playback-note" role="status">
+                          {speechFallbackMessage}
+                        </p>
+                      )}
                       <div className="pinyin-result__content">
-                        {(() => {
-                          const lineGroups = groupSegmentsByLine(pinyinSegments)
+                        {lineGroups.map((group, groupIndex) => {
+                          const spokenLineText = buildSpokenLineText(group)
+                          const lineKey = `${group.line_id}-${groupIndex}`
+                          const isPlaying = activeLineKey === lineKey
+                          const isPlaybackDisabled = !!speechFallbackMessage || !selectedVoice || !spokenLineText
+                          const buttonLabel = isPlaybackDisabled
+                            ? `Pronunciation unavailable for ${spokenLineText}`
+                            : `${isPlaying ? 'Stop' : 'Play'} pronunciation for ${spokenLineText}`
+                          const translationSegment = group.segments.find(s => s.translation_text)
 
-                          if (!lineGroups) {
-                            return pinyinSegments.map((seg, index) => (
-                              <ruby key={`${seg.source_text}-${seg.alignment_status}-${index}`}>
-                                {seg.source_text}
-                                <rt>{renderPinyinAnnotation(seg)}</rt>
-                              </ruby>
-                            ))
-                          }
-
-                          return lineGroups.map((group, groupIndex) => (
+                          return (
                             <div
                               key={`line-${group.line_id}-${groupIndex}`}
                               className="pinyin-line-group"
                             >
-                              {group.segments.map((seg, segmentIndex) => (
-                                <ruby key={`${seg.source_text}-${seg.alignment_status}-${segmentIndex}`}>
-                                  {seg.source_text}
-                                  <rt>{renderPinyinAnnotation(seg)}</rt>
-                                </ruby>
-                              ))}
-                              {group.segments.find(s => s.translation_text) && (
+                              <div className="pinyin-line-group__header">
+                                <div className="pinyin-line-group__ruby">
+                                  {group.segments.map((seg, segmentIndex) => (
+                                    <ruby key={`${seg.source_text}-${seg.alignment_status}-${segmentIndex}`}>
+                                      {seg.source_text}
+                                      <rt>{renderPinyinAnnotation(seg)}</rt>
+                                    </ruby>
+                                  ))}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="pinyin-playback-button"
+                                  aria-label={buttonLabel}
+                                  aria-pressed={isPlaying}
+                                  disabled={isPlaybackDisabled}
+                                  onClick={() => handleLinePlayback(group, groupIndex)}
+                                >
+                                  {isPlaybackDisabled ? 'Unavailable' : isPlaying ? 'Stop' : 'Play'}
+                                </button>
+                              </div>
+                              {translationSegment && (
                                 <p className="pinyin-line-translation">
-                                  {group.segments.find(s => s.translation_text).translation_text}
+                                  {translationSegment.translation_text}
                                 </p>
                               )}
                             </div>
-                          ))
-                        })()}
+                          )
+                        })}
                       </div>
                     </div>
                   )}

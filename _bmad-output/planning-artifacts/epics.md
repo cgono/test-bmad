@@ -815,6 +815,41 @@ Translation is per line group (one translation per `line_id` group, not per char
 
 **Note:** Added via sprint-change-proposal-2026-03-29-translation-release.md
 
+### Story 6.2: Add Per-Line Pronunciation Playback Controls
+
+As Clint,
+I want to play back the pronunciation for each rendered line of Chinese text,
+So that I can hear the line while following the page without leaving the app.
+
+**Acceptance Criteria:**
+
+**Given** a successful OCR + pinyin result with grouped lines
+**When** the browser supports speech synthesis
+**Then** each rendered line group includes a pronunciation playback control
+**And** activating the control speaks that line's combined Chinese source text without changing the API response contract.
+
+**Given** a rendered line group contains multiple `PinyinSegment` items with the same `line_id`
+**When** pronunciation playback is triggered for that line
+**Then** the spoken text is built from the concatenated `source_text` values for that line group in order
+**And** playback is scoped to that line only.
+
+**Given** pronunciation playback is already active for one line
+**When** the user starts playback for another line or stops the current line
+**Then** the previous utterance is cancelled
+**And** the UI state updates so only the active line is shown as playing.
+
+**Given** the browser does not support speech synthesis, cannot find a suitable Chinese voice, or playback fails
+**When** the result is displayed or playback is attempted
+**Then** the existing reading result remains fully usable
+**And** pronunciation controls are disabled or hidden with a non-blocking fallback message
+**And** no backend error or response-contract change is introduced.
+
+**Given** all existing frontend and backend tests run
+**When** story 6.2 is implemented
+**Then** all existing tests continue to pass.
+
+**Note:** Inferred during create-story on 2026-03-30 from Epic 6's reserved "future audio pronunciation" scope and Story 6.1's line-group rendering model.
+
 ---
 
 ## Epic 5: History, Reuse & Future Evolution
