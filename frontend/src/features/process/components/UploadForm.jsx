@@ -746,7 +746,7 @@ export default function UploadForm() {
                               ))}
                               {group.segments.find(s => s.translation_text) && (
                                 <p className="pinyin-line-translation">
-                                  {group.segments.find(s => s.translation_text).translation_text}
+                                  {translationSegment.translation_text}
                                 </p>
                               )}
                             </div>
