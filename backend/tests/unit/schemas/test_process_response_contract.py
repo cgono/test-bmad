@@ -5,6 +5,8 @@ from app.schemas.diagnostics import DiagnosticsPayload, TimingInfo, TraceInfo, U
 from app.schemas.process import (
     OcrData,
     OcrSegment,
+    PinyinData,
+    PinyinSegment,
     ProcessData,
     ProcessError,
     ProcessResponse,
@@ -183,3 +185,39 @@ def test_error_envelope_rejects_diagnostics() -> None:
             error=ProcessError(code="invalid-image", message="Unsupported file"),
             diagnostics=_minimal_diagnostics(),
         )
+
+
+def test_pinyin_segment_accepts_nullable_translation_text() -> None:
+    segment = PinyinSegment(
+        source_text="你好",
+        pinyin_text="nǐ hǎo",
+        alignment_status="aligned",
+        translation_text=None,
+    )
+
+    assert segment.translation_text is None
+
+
+def test_success_envelope_preserves_translation_text() -> None:
+    response = ProcessResponse(
+        status="success",
+        request_id="req-14",
+        data=ProcessData(
+            ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.88)]),
+            pinyin=PinyinData(
+                segments=[
+                    PinyinSegment(
+                        source_text="你好",
+                        pinyin_text="nǐ hǎo",
+                        alignment_status="aligned",
+                        translation_text="hello",
+                    )
+                ]
+            ),
+        ),
+        diagnostics=_minimal_diagnostics(),
+    )
+
+    assert response.data is not None
+    assert response.data.pinyin is not None
+    assert response.data.pinyin.segments[0].translation_text == "hello"

@@ -24,6 +24,7 @@ class PinyinSegment(BaseModel):
     alignment_status: Literal["aligned", "uncertain"]
     reason_code: str | None = None
     line_id: int | None = None
+    translation_text: str | None = None
 
 
 class PinyinData(BaseModel):

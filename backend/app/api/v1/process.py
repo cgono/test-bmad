@@ -25,6 +25,7 @@ from app.services.image_validation import (
 )
 from app.services.ocr_service import OcrServiceError, extract_chinese_segments, is_low_confidence
 from app.services.pinyin_service import PinyinServiceError, generate_pinyin
+from app.services.translation_service import enrich_translations
 
 try:
     import sentry_sdk
@@ -145,6 +146,7 @@ async def _build_process_response(
     try:
         pinyin_data = await generate_pinyin(segments)
         pinyin_ms = (time.monotonic() - pinyin_start) * 1000
+        pinyin_data = await enrich_translations(pinyin_data)
         trace_steps.append(TraceStep(step="pinyin", status="ok"))
     except PinyinServiceError as error:
         pinyin_ms = (time.monotonic() - pinyin_start) * 1000

@@ -85,13 +85,15 @@ const MULTI_LINE_SUCCESS_RESPONSE = {
           source_text: '老师叫',
           pinyin_text: 'lǎo shī jiào',
           alignment_status: 'aligned',
-          line_id: 0
+          line_id: 0,
+          translation_text: 'Teacher says'
         },
         {
           source_text: '同学们好',
           pinyin_text: 'tóng xué men hǎo',
           alignment_status: 'aligned',
-          line_id: 1
+          line_id: 1,
+          translation_text: 'Hello, students'
         },
       ]
     },
@@ -115,12 +117,14 @@ const NULL_LINE_ID_SUCCESS_RESPONSE = {
           source_text: '老师叫',
           pinyin_text: 'lǎo shī jiào',
           alignment_status: 'aligned',
+          translation_text: null,
           line_id: null
         },
         {
           source_text: '同学们好',
           pinyin_text: 'tóng xué men hǎo',
           alignment_status: 'aligned',
+          translation_text: null,
           line_id: null
         },
       ]
@@ -249,6 +253,57 @@ describe('UploadForm', () => {
     expect(within(lineGroups[1]).getByText('同学们好')).toBeInTheDocument()
   })
 
+  it('renders translation once per line group with muted styling', async () => {
+    submitProcessRequest.mockResolvedValueOnce({
+      ...MULTI_LINE_SUCCESS_RESPONSE,
+      data: {
+        ...MULTI_LINE_SUCCESS_RESPONSE.data,
+        pinyin: {
+          segments: [
+            {
+              source_text: '老',
+              pinyin_text: 'lǎo',
+              alignment_status: 'aligned',
+              line_id: 0,
+              translation_text: 'teacher'
+            },
+            {
+              source_text: '师',
+              pinyin_text: 'shī',
+              alignment_status: 'aligned',
+              line_id: 0,
+              translation_text: 'teacher'
+            },
+            {
+              source_text: '你好',
+              pinyin_text: 'nǐ hǎo',
+              alignment_status: 'aligned',
+              line_id: 1,
+              translation_text: 'hello'
+            },
+          ]
+        }
+      }
+    })
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/pinyin-result/i)
+
+    const lineGroups = container.querySelectorAll('.pinyin-line-group')
+    expect(lineGroups).toHaveLength(2)
+    expect(within(lineGroups[0]).getByText('teacher')).toBeInTheDocument()
+    expect(within(lineGroups[1]).getByText('hello')).toBeInTheDocument()
+    expect(container.querySelectorAll('.pinyin-line-translation')).toHaveLength(2)
+    expect(screen.getAllByText('teacher')).toHaveLength(1)
+  })
+
   it('falls back to flat pinyin rendering when all line ids are null', async () => {
     submitProcessRequest.mockResolvedValueOnce(NULL_LINE_ID_SUCCESS_RESPONSE)
 
@@ -266,6 +321,7 @@ describe('UploadForm', () => {
     expect(within(pinyinResult).getByText('老师叫')).toBeInTheDocument()
     expect(within(pinyinResult).getByText('同学们好')).toBeInTheDocument()
     expect(container.querySelectorAll('ruby')).toHaveLength(2)
+    expect(container.querySelectorAll('.pinyin-line-translation')).toHaveLength(0)
   })
 
   it('shows uncertain segments explicitly when alignment fails for one segment', async () => {

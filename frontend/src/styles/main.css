@@ -266,6 +266,12 @@ body {
   color: var(--color-text-secondary);
 }
 
+.pinyin-line-translation {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
 /* ─── Details Section (progressive disclosure) ──────────────────── */
 
 .details-section {
