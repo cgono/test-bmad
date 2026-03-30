@@ -69,6 +69,10 @@ function buildSpokenLineText(group) {
   return group.segments.map((segment) => segment.source_text).join('')
 }
 
+function buildLineKey(group, groupIndex) {
+  return `${group.line_id ?? 'line'}-${groupIndex}`
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -79,8 +83,11 @@ export default function UploadForm() {
   const [selectedVoice, setSelectedVoice] = useState(null)
   const [speechFallbackMessage, setSpeechFallbackMessage] = useState(null)
   const [activeLineKey, setActiveLineKey] = useState(null)
+  const [isPagePlaybackActive, setIsPagePlaybackActive] = useState(false)
   const activeLineKeyRef = useRef(null)
   const activeUtteranceRef = useRef(null)
+  const activePlaybackModeRef = useRef(null)
+  const playbackSessionRef = useRef(0)
   const ignoreNextSpeechErrorRef = useRef(false)
   const cancelPlaybackIfActiveRef = useRef(() => {})
 
@@ -154,11 +161,15 @@ export default function UploadForm() {
   const ocrSegments = mutation.data?.data?.ocr?.segments || []
   const isLowConfidence = mutation.data?.warnings?.some(w => w.code === 'ocr_low_confidence') ?? false
   const lineGroups = groupSegmentsByLine(pinyinSegments)
+  const hasGroupedLines = (lineGroups?.length ?? 0) > 0
 
   function clearActivePlayback() {
     activeLineKeyRef.current = null
     activeUtteranceRef.current = null
+    activePlaybackModeRef.current = null
+    playbackSessionRef.current += 1
     setActiveLineKey(null)
+    setIsPagePlaybackActive(false)
   }
 
   function cancelPlayback() {
@@ -216,30 +227,37 @@ export default function UploadForm() {
     cancelPlaybackIfActiveRef.current()
   }, [mutation.data?.request_id])
 
-  const handleLinePlayback = (group, groupIndex) => {
+  function startUtterance({
+    lineText,
+    lineKey,
+    mode,
+    onSequenceEnd,
+  }) {
     const speechSynthesis = globalThis.window?.speechSynthesis
-    const lineText = buildSpokenLineText(group)
-    const lineKey = `${group.line_id}-${groupIndex}`
 
     if (!speechSynthesis || !selectedVoice || !lineText) {
       return
     }
 
-    if (activeLineKeyRef.current === lineKey) {
-      cancelPlayback()
-      return
-    }
-
-    cancelPlayback()
+    const sessionId = playbackSessionRef.current + 1
+    playbackSessionRef.current = sessionId
 
     try {
       const utterance = new globalThis.SpeechSynthesisUtterance(lineText)
       utterance.voice = selectedVoice
       utterance.lang = selectedVoice.lang || 'zh-CN'
       utterance.onend = () => {
-        if (activeLineKeyRef.current === lineKey) {
+        if (playbackSessionRef.current !== sessionId || activeLineKeyRef.current !== lineKey) {
+          ignoreNextSpeechErrorRef.current = false
+          return
+        }
+
+        if (mode === 'page' && typeof onSequenceEnd === 'function') {
+          onSequenceEnd()
+        } else {
           clearActivePlayback()
         }
+
         ignoreNextSpeechErrorRef.current = false
       }
       utterance.onerror = (event) => {
@@ -248,7 +266,7 @@ export default function UploadForm() {
           event?.error === 'canceled' ||
           event?.error === 'interrupted'
 
-        if (activeLineKeyRef.current === lineKey) {
+        if (playbackSessionRef.current === sessionId && activeLineKeyRef.current === lineKey) {
           clearActivePlayback()
         }
 
@@ -259,15 +277,79 @@ export default function UploadForm() {
         ignoreNextSpeechErrorRef.current = false
       }
 
+      activePlaybackModeRef.current = mode
       activeLineKeyRef.current = lineKey
       activeUtteranceRef.current = utterance
       setActiveLineKey(lineKey)
+      setIsPagePlaybackActive(mode === 'page')
       ignoreNextSpeechErrorRef.current = false
       speechSynthesis.speak(utterance)
     } catch {
       clearActivePlayback()
       setSpeechFallbackMessage('Pronunciation playback is unavailable right now.')
     }
+  }
+
+  function startPagePlayback(groupIndex = 0) {
+    if (!hasGroupedLines || !lineGroups?.[groupIndex]) {
+      clearActivePlayback()
+      return
+    }
+
+    const group = lineGroups[groupIndex]
+    const lineText = buildSpokenLineText(group)
+    const lineKey = buildLineKey(group, groupIndex)
+
+    startUtterance({
+      lineText,
+      lineKey,
+      mode: 'page',
+      onSequenceEnd: () => {
+        const nextIndex = groupIndex + 1
+
+        if (!lineGroups?.[nextIndex]) {
+          clearActivePlayback()
+          return
+        }
+
+        startPagePlayback(nextIndex)
+      },
+    })
+  }
+
+  const handleLinePlayback = (group, groupIndex) => {
+    const lineText = buildSpokenLineText(group)
+    const lineKey = buildLineKey(group, groupIndex)
+
+    if (!selectedVoice || !lineText) {
+      return
+    }
+
+    if (activePlaybackModeRef.current === 'line' && activeLineKeyRef.current === lineKey) {
+      cancelPlayback()
+      return
+    }
+
+    cancelPlayback()
+    startUtterance({
+      lineText,
+      lineKey,
+      mode: 'line',
+    })
+  }
+
+  const handlePagePlayback = () => {
+    if (!selectedVoice || !hasGroupedLines) {
+      return
+    }
+
+    if (activePlaybackModeRef.current === 'page') {
+      cancelPlayback()
+      return
+    }
+
+    cancelPlayback()
+    startPagePlayback()
   }
 
   return (
@@ -401,16 +483,38 @@ export default function UploadForm() {
 
                   {pinyinSegments.length > 0 && (
                     <div aria-label="pinyin-result">
-                      <h3 className="pinyin-result__title">Pinyin Reading</h3>
+                      <div className="pinyin-result__header">
+                        <h3 className="pinyin-result__title">Pinyin Reading</h3>
+                        {hasGroupedLines && (
+                          <button
+                            type="button"
+                            className="pinyin-playback-button pinyin-playback-button--page"
+                            aria-label={
+                              isPagePlaybackActive
+                                ? 'Stop page pronunciation playback'
+                                : 'Play page pronunciation playback'
+                            }
+                            aria-pressed={isPagePlaybackActive}
+                            disabled={!!speechFallbackMessage || !selectedVoice}
+                            onClick={handlePagePlayback}
+                          >
+                            {speechFallbackMessage || !selectedVoice
+                              ? 'Unavailable'
+                              : isPagePlaybackActive
+                                ? 'Stop Page'
+                                : 'Play Page'}
+                          </button>
+                        )}
+                      </div>
                       {speechFallbackMessage && (
                         <p className="pinyin-playback-note" role="status">
                           {speechFallbackMessage}
                         </p>
                       )}
                       <div className="pinyin-result__content">
-                        {lineGroups.map((group, groupIndex) => {
+                        {hasGroupedLines ? lineGroups.map((group, groupIndex) => {
                           const spokenLineText = buildSpokenLineText(group)
-                          const lineKey = `${group.line_id}-${groupIndex}`
+                          const lineKey = buildLineKey(group, groupIndex)
                           const isPlaying = activeLineKey === lineKey
                           const isPlaybackDisabled = !!speechFallbackMessage || !selectedVoice || !spokenLineText
                           const buttonLabel = isPlaybackDisabled
@@ -421,7 +525,7 @@ export default function UploadForm() {
                           return (
                             <div
                               key={`line-${group.line_id}-${groupIndex}`}
-                              className="pinyin-line-group"
+                              className={`pinyin-line-group${isPlaying ? ' pinyin-line-group--active' : ''}`}
                             >
                               <div className="pinyin-line-group__header">
                                 <div className="pinyin-line-group__ruby">
@@ -450,7 +554,18 @@ export default function UploadForm() {
                               )}
                             </div>
                           )
-                        })}
+                        }) : (
+                          <div className="pinyin-result__flat">
+                            <div className="pinyin-line-group__ruby">
+                              {pinyinSegments.map((seg, segmentIndex) => (
+                                <ruby key={`${seg.source_text}-${seg.alignment_status}-${segmentIndex}`}>
+                                  {seg.source_text}
+                                  <rt>{renderPinyinAnnotation(seg)}</rt>
+                                </ruby>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

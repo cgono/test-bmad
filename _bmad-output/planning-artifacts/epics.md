@@ -850,6 +850,42 @@ So that I can hear the line while following the page without leaving the app.
 
 **Note:** Inferred during create-story on 2026-03-30 from Epic 6's reserved "future audio pronunciation" scope and Story 6.1's line-group rendering model.
 
+### Story 6.3: Add Full-Page Sequential Pronunciation Playback
+
+As Clint,
+I want to play the current page's Chinese lines from top to bottom,
+So that I can follow the whole reading flow without tapping each line individually.
+
+**Acceptance Criteria:**
+
+**Given** a successful OCR + pinyin result with grouped lines and pronunciation playback support
+**When** the user starts full-page playback
+**Then** the UI plays each rendered line group's combined Chinese source text in visual order
+**And** only one utterance is active at a time
+**And** the active line is clearly indicated while playback advances.
+
+**Given** full-page playback is active
+**When** the user stops playback, starts playback on a different line, or a new result replaces the current page
+**Then** the current utterance and any queued continuation are cancelled immediately
+**And** playback state resets without leaving stale active indicators.
+
+**Given** full-page playback reaches the last available line
+**When** the final utterance finishes
+**Then** playback stops automatically
+**And** the UI returns to the idle state with no active line or page-level playing status.
+
+**Given** the browser does not support speech synthesis, cannot find a suitable Chinese voice, or playback fails mid-sequence
+**When** the result is displayed or playback is attempted
+**Then** the existing reading result remains fully usable
+**And** full-page playback controls are disabled or hidden with the same non-blocking fallback pattern used for per-line playback
+**And** no backend error or response-contract change is introduced.
+
+**Given** all existing frontend and backend tests run
+**When** story 6.3 is implemented
+**Then** all existing tests continue to pass.
+
+**Note:** Inferred during create-story on 2026-03-30 from the remaining Epic 6 audio-pronunciation scope, the UX goal of uninterrupted page-reading flow, and the browser-based playback foundation established in Story 6.2.
+
 ---
 
 ## Epic 5: History, Reuse & Future Evolution
