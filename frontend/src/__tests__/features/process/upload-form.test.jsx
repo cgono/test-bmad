@@ -243,8 +243,83 @@ const NULL_LINE_ID_SUCCESS_RESPONSE = {
   }
 }
 
+const TEXT_MODE_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_text_mode',
+  data: {
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师说 Hello',
+          pinyin_text: 'lǎo shī shuō   H e l l o',
+          alignment_status: 'aligned',
+          line_id: 0,
+          translation_text: 'Teacher says hello'
+        },
+        {
+          source_text: '同学们好',
+          pinyin_text: 'tóng xué men hǎo',
+          alignment_status: 'aligned',
+          line_id: 1,
+          translation_text: 'Hello, students'
+        },
+      ]
+    },
+    reading: {
+      mode: 'derived',
+      provider: {
+        kind: 'heuristic',
+        name: 'built_in_rules',
+        version: 'v2',
+        applied: true,
+        confidence: 0.8,
+        warnings: []
+      },
+      groups: [
+        {
+          group_id: 'text_0',
+          line_id: 0,
+          raw_text: '老师说 Hello',
+          display_text: '老师说 Hello。',
+          playback_text: '老师说 Hello。',
+          confidence: 0.8,
+          segment_indexes: [0]
+        },
+        {
+          group_id: 'text_1',
+          line_id: 1,
+          raw_text: '同学们好',
+          display_text: '同学们好。',
+          playback_text: '同学们好。',
+          confidence: 0.8,
+          segment_indexes: [1]
+        },
+      ]
+    },
+    job_id: null
+  },
+  diagnostics: {
+    upload_context: {
+      content_type: 'text/plain',
+      file_size_bytes: 23
+    },
+    timing: {
+      total_ms: 10,
+      ocr_ms: 0,
+      pinyin_ms: 5
+    },
+    trace: {
+      steps: [
+        { step: 'ocr', status: 'skipped' },
+        { step: 'pinyin', status: 'ok' },
+      ]
+    }
+  }
+}
+
 vi.mock('../../../lib/api-client', () => ({
-  submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE)
+  submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE),
+  submitTextProcessRequest: vi.fn(async () => TEXT_MODE_SUCCESS_RESPONSE)
 }))
 
 vi.mock('react-image-crop', () => ({
@@ -257,7 +332,7 @@ vi.mock('react-image-crop', () => ({
   },
 }))
 
-import { submitProcessRequest } from '../../../lib/api-client'
+import { submitProcessRequest, submitTextProcessRequest } from '../../../lib/api-client'
 
 function createSpeechSynthesisMock({ voices = [{ name: 'Chinese Voice', lang: 'zh-CN' }] } = {}) {
   const utterances = []
@@ -305,6 +380,8 @@ describe('UploadForm', () => {
   beforeEach(() => {
     submitProcessRequest.mockReset()
     submitProcessRequest.mockImplementation(async () => DEFAULT_SUCCESS_RESPONSE)
+    submitTextProcessRequest.mockReset()
+    submitTextProcessRequest.mockImplementation(async () => TEXT_MODE_SUCCESS_RESPONSE)
     // P5: save originals so they can be restored after each test
     originalGetContext = globalThis.HTMLCanvasElement.prototype.getContext
     originalToBlob = globalThis.HTMLCanvasElement.prototype.toBlob
@@ -341,6 +418,66 @@ describe('UploadForm', () => {
 
     expect(screen.getByRole('button', { name: /take photo/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/upload image/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /paste text/i })).toBeInTheDocument()
+  })
+
+  it('submits pasted text through the text endpoint and reuses the reading surface', async () => {
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.type(screen.getByLabelText(/paste chinese text/i), '老师说 Hello\n同学们好')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(submitTextProcessRequest).toHaveBeenCalledWith('老师说 Hello\n同学们好')
+    expect(await screen.findByText(/request id:\s*req_text_mode/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/pinyin-result/i)).toBeInTheDocument()
+    expect(screen.queryByAltText(/uploaded image/i)).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.pinyin-line-group')).toHaveLength(2)
+  })
+
+  it('shows pasted-text validation guidance inline', async () => {
+    submitTextProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('empty text'), { code: 'text_empty' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/paste some chinese text/i)
+  })
+
+  it('shows no-chinese guidance inline for text_no_chinese_text error', async () => {
+    submitTextProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('no chinese text'), { code: 'text_no_chinese_text' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.type(screen.getByLabelText(/paste chinese text/i), 'Hello world')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no chinese text was detected/i)
+  })
+
+  it('shows too-long guidance inline for text_too_long error', async () => {
+    submitTextProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('text too long'), { code: 'text_too_long' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.type(screen.getByLabelText(/paste chinese text/i), '你好')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/text is too long/i)
   })
 
   it('submits to process endpoint through api client', async () => {
