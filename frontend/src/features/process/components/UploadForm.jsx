@@ -808,9 +808,9 @@ export default function UploadForm() {
                                   <rt>{renderPinyinAnnotation(seg)}</rt>
                                 </ruby>
                               ))}
-                              {group.segments.find(s => s.translation_text) && (
+                              {pinyinSegments.find(s => s.translation_text) && (
                                 <p className="pinyin-line-translation">
-                                  {translationSegment.translation_text}
+                                  {pinyinSegments.find(s => s.translation_text).translation_text}
                                 </p>
                               )}
                             </div>
