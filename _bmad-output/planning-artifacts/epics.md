@@ -776,6 +776,36 @@ So that I never manually bump versions or publish releases, and a malformed rend
 
 **Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
 
+### Story 4.8: Track Google Translate Cost for Pasted-Text Requests
+
+As Clint,
+I want pasted-text translation requests included in request-cost estimation and daily budget accounting,
+So that the budget system reflects actual Google Translate spend instead of treating text study as free.
+
+**Acceptance Criteria:**
+
+**Given** a `POST /v1/process-text` request is accepted for translation processing
+**When** request cost is estimated
+**Then** the system calculates text-processing cost from submitted text size using configured Google Translate pricing rules
+**And** the estimated cost is returned through the same diagnostics/metrics field used by image requests.
+
+**Given** a pasted-text request completes
+**When** cost accounting is recorded
+**Then** the request cost is persisted through the same daily accounting path as image requests
+**And** daily totals include text-translation spend when evaluating budget warnings or enforcement.
+
+**Given** translation is disabled, skipped, or provider-pricing metadata is unavailable
+**When** the text-request estimate is prepared
+**Then** the system uses the same explicit fallback/confidence signaling pattern defined in Story 4.3
+**And** the request still completes without misreporting the cost path as OCR-based.
+
+**Given** backend tests run
+**When** text-processing cost support is added
+**Then** targeted coverage verifies request diagnostics, daily aggregate totals, and budget-threshold behavior for pasted-text requests
+**And** existing image-request cost behavior remains unchanged.
+
+**Note:** Added via sprint-change-proposal-2026-04-01-translate-budget.md
+
 ## Epic 6: Translation, Pronunciation & Direct Text Study
 
 Add English translation for extracted Chinese text, pronunciation support, assistive reading improvements, and a direct pasted-text study flow.

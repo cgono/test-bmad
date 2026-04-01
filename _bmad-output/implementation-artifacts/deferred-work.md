@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of 4-8-track-google-translate-cost-for-pasted-text-requests (2026-04-01)
+
+- Direct `os.environ.get()` in `estimate_text_processing_cost` bypasses app config layer — pre-existing pattern, `estimate_request_cost` uses the same approach
+- `_GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS` constant and `.env.example` value can drift independently — pre-existing, same situation as `_GCV_USD_PER_IMAGE`
+
 ## Deferred from: code review of 6-6-add-direct-pasted-text-study-mode (2026-04-01)
 
 - Private helper imports from `process.py` (`_build_validation_error_response`, `_make_diagnostics` etc.) across modules — refactoring to a shared helpers module requires touching `process.py`, separate concern

@@ -444,7 +444,7 @@ test-bmad/
 
 **Service Boundaries:**
 - `process_service` orchestrates OCR + pinyin + translation + diagnostics for image input.
-- `process_text_service` orchestrates pasted-text validation + pinyin + translation while reusing the same downstream response contract.
+- `process_text_service` orchestrates pasted-text validation + pinyin + translation while reusing the same downstream response contract and participating in the same budget-accounting pipeline.
 - Provider-specific logic stays in `adapters/*_provider.py`.
 - Budget, diagnostics, and history services remain independent cross-cutting units.
 
@@ -461,7 +461,7 @@ test-bmad/
 - OCR + language filtering -> `backend/app/services/ocr_service.py`, `backend/app/adapters/ocr_provider.py`.
 - Pinyin generation -> `backend/app/services/pinyin_service.py`, `backend/app/adapters/pinyin_provider.py`.
 - Diagnostics + traces -> `backend/app/services/diagnostics_service.py`, `frontend/src/features/process/components/DiagnosticsPanel.jsx`.
-- Budget guardrail -> `backend/app/services/budget_service.py`.
+- Budget guardrail for both `/v1/process` and `/v1/process-text` -> `backend/app/services/budget_service.py`, including OCR/image estimation and text-translation estimation from provider pricing inputs.
 - Health/metrics -> `backend/app/api/v1/health.py`, `backend/app/api/v1/metrics.py`.
 - History API surface -> `backend/app/api/v1/history.py`, `backend/app/services/history_service.py`, `frontend/src/features/history/*`.
 

@@ -69,7 +69,10 @@ async def process_text(payload: TextProcessRequest, request: Request) -> Process
         content_type="text/plain",
         file_size_bytes=len(payload.source_text.encode("utf-8")),
     )
-    cost_estimate = CostEstimate(estimated_usd=0.0, estimated_sgd=0.0, confidence="full")
+    translated_char_count = sum(len(segment.text) for segment in cjk_segments)
+    cost_estimate = budget_service.estimate_text_processing_cost(
+        char_count=translated_char_count
+    )
 
     pinyin_start = time.monotonic()
     try:
@@ -79,6 +82,7 @@ async def process_text(payload: TextProcessRequest, request: Request) -> Process
             pinyin_data = await enrich_translations(pinyin_data)
         except Exception:
             logger.exception("translation enrichment failed; continuing without translations")
+            cost_estimate = CostEstimate(confidence="unavailable")
         if passthrough_segments:
             passthrough_pinyin = [
                 PinyinSegment(
@@ -92,6 +96,7 @@ async def process_text(payload: TextProcessRequest, request: Request) -> Process
             merged = pinyin_data.segments + passthrough_pinyin
             merged.sort(key=lambda seg: seg.line_id if seg.line_id is not None else float("inf"))
             pinyin_data = PinyinData(segments=merged)
+        budget_service.record_request_cost(cost_estimate)
         try:
             reading_data = build_reading_projection(pinyin_data)
         except Exception:

@@ -127,7 +127,7 @@ A second edge case appears when the source page already includes Chinese charact
 
 ### Journey 4: Admin/Operations Journey (Cost and Usage Control)
 
-In admin mode (same user, different role), Clint reviews a lightweight ops panel to understand usage, latency, and cost. He monitors per-request timings, error rates, and cost estimates for OCR/LLM/tool calls. The immediate objective is to keep the weekend prototype affordable while learning observability patterns using Sentry for error and performance monitoring. Later, this same path expands to saved book management and deployment health checks.
+In admin mode (same user, different role), Clint reviews a lightweight ops panel to understand usage, latency, and cost. He monitors per-request timings, error rates, and cost estimates for OCR, translation, and other tool/provider calls. The immediate objective is to keep the weekend prototype affordable while learning observability patterns using Sentry for error and performance monitoring. Later, this same path expands to saved book management and deployment health checks.
 
 Success in this journey is operational confidence: the app is cheap enough to run, issues are observable, and system behavior is measurable.
 
